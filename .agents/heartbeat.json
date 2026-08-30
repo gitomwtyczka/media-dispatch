@@ -1,17 +1,17 @@
 {
-  "callsign": "media-dev-03",
-  "status": "done",
-  "current_task": "handoff + fix tytułów YT",
-  "timestamp": "2026-08-30T01:03:00Z",
+  "callsign": "media-strateg",
+  "status": "working",
+  "current_task": "Briefing read, planning next session tasks",
+  "timestamp": "2026-08-30T10:53:00+02:00",
   "last_completed": [
-    "Fix tytułów YouTube dla 6 filmów",
-    "git pull lokalnego playgroundu media-dispatch",
-    "CURRENT_BRIEF.md — utworzono nowy brief",
-    "prawy_standard_pipeline.py — utworzono szkielet pipeline B"
+    "Sesja 29-30.08: 7 filmów biblijnych (30.08-05.09.2026) — pełny pipeline A",
+    "Konstytucja workera: .agents/knowledge/vse-worker-constitution.md",
+    "Prawy TV standard pipeline — szkielet: prawy_standard_pipeline.py",
+    "Fix tytułów YT dla 6 filmów"
   ],
   "pending": [
-    "Napisy VTT dla filmów 28.08 i 29.08",
-    "Weryfikacja postów na prawy.pl",
-    "Implementacja Prawy TV standard pipeline"
+    "Napisy VTT dla filmów 28.08 i 29.08 — nie zrealizowane w poprzedniej sesji",
+    "Weryfikacja postów na prawy.pl (schema VideoObject w source)",
+    "Implementacja Pipeline B (prawy_standard_pipeline.py) — szkielet gotowy, pełna implementacja pending"
   ]
 }
