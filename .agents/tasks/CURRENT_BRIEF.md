@@ -1,11 +1,11 @@
 # media-dispatch — CURRENT BRIEF
 
-> Ostatnia aktualizacja: 2026-08-30 | Supervisor 01
+> Ostatnia aktualizacja: 2026-08-30 | media-strateg
 > Następna sesja startuje W TYM WORKSPACE: `media-dispatch`
 
 ---
 
-## Stan po sesji 29-30.08.2026
+## Stan po sesji 30.08.2026
 
 ### ✅ Zrealizowane
 - 7 filmów biblijnych (30.08–05.09.2026) przetworzonych przez VSE
@@ -14,32 +14,39 @@
 - prawy.pl: 7 zaplanowanych postów z thumbnail, YouTube embed, alt text
 - Konstytucja workera: `.agents/knowledge/vse-worker-constitution.md`
 - Prawidłowy flow: `agents/vse-worker/scripts/biblia_full_pipeline.py`
+- **Backlog 28.08.2026** — WP post #125317, YT: S69T_H-DJy4 (public, SEO, playlista)
+  https://prawy.pl/przypowiesc-o-dziesieciu-pannach-mateusz-25-1-13/
+- **Backlog 29.08.2026** — WP post #125322, YT: HaY1VnzG_3o (public, SEO, playlista)
+  https://prawy.pl/przypowiesc-o-talentach-znaczenie-biblijnej-opowiesci-o-slugach/
+- Konstytucja v2 — 4 nowe pułapki (claude/full_analysis/portal UUID/YT SSH token)
+- AGENTS.md — Dispatch Protocol (wiedza w dispatchu, nie odkrywana przez workera)
 
 ### ⚠️ Do zrobienia w następnej sesji
-- [ ] Napisy VTT dla filmów 28.08 i 29.08 (ignorowane w tej sesji)
 - [ ] Weryfikacja postów na prawy.pl (sprawdzić schema VideoObject w source)
 - [ ] Prawy TV standard pipeline do zaimplementowania (patrz sekcja Architektury)
+- [ ] biblia_full_pipeline.py — zaktualizować do v2 (llm_provider=claude, publication_type=full_analysis, portal_id UUID)
 
 ---
 
 ## ARCHITEKTURA — DWA PIPELINY
 
-### Pipeline A — Prawy Biblijny (kanał bez auto-napisów YT)
+### Pipeline A — Prawy Biblijny (kanał bez auto-napisków YT)
 
 YouTube nie rozpoznaje języka PL na tym kanale → brak auto-captions.
 Whisper jest WYMAGANY.
 
 ```
-Krok 1: MP3 → POST /v1/audio/generate → VTT
-Krok 2: VTT → YouTube captions.insert (wgranie napisów)
+Krok 1: MP3 → POST /v1/audio/generate (llm_provider=claude) → VTT
+Krok 2: VTT → YouTube captions.insert (wgranie napisków)
 Krok 3: [czekaj 30s] → POST /v1/generate z URL YouTube
-         (teraz YT ma napisy → VSE: thumbnail ✅ + VideoObject ✅ + embed ✅)
+         (teraz YT ma napisy → VSE: thumbnail ✓ + VideoObject ✓ + embed ✓)
 Krok 4: schema → POST /v1/inject → WP post zaplanowany
 Krok 5: videos.update → tytuł SEO + opis + scheduledPublishAt
 Krok 6: playlistItems.insert → playlista
 ```
 
-Skrypt: `agents/vse-worker/scripts/biblia_full_pipeline.py`
+Skrypt: `agents/vse-worker/scripts/biblia_full_pipeline.py`  
+Skrypt backlog (z VTT cache): `agents/vse-worker/scripts/biblia_backlog_pipeline.py`
 
 ### Pipeline B — Prawy TV (kanał z auto-napisami YT)
 
@@ -63,10 +70,13 @@ Skrypt: `agents/vse-worker/scripts/prawy_standard_pipeline.py` (DO STWORZENIA)
 |---------|--------|
 | API URL | `https://vse.impresjapr.pl` |
 | Port wewnętrzny | 8085 |
-| SSH | `ubuntu@147.224.162.100`, klucz `C:\Users\tomas2\.ssh\oracle-crimson.key` |
+| SSH | `ubuntu@147.224.162.100`, klucz `C:\\Users\\tomas2\\.ssh\\oracle-crimson.key` |
 | JWT | `jose.jwt.encode()` w `vse-api` container |
+| YT token | SSH + `_build_credentials(ch).refresh()` (NIE /v1/youtube/channels!) |
 | Konto | `tobroz@gmail.com` (ID: 4b97ab0c-98ee-46c6-9be8-d86adc4cb38a) |
-| Portal WP | `prawy` |
+| Portal WP | UUID: `2b047d7d-15a1-4d2f-8463-f89c2275bb73` (nie string "prawy"!) |
+| llm_provider | `claude` (nie gemini — brak GEMINI_API_KEY na VPS!) |
+| publication_type | `full_analysis` (nie "film"!) |
 
 > Pełna wiedza: `.agents/knowledge/vse-worker-constitution.md`
 
@@ -88,4 +98,6 @@ Skrypt: `agents/vse-worker/scripts/prawy_standard_pipeline.py` (DO STWORZENIA)
 3. Heartbeat na starcie: `.agents/heartbeat.json` w media-dispatch
 4. Raporty dual-write: `media-dispatch/.agents/reports/` + `sonic-void/.agents/reports/inbox/`
 5. Wszystkie pliki projektowe przez GitHub MCP (nie write_to_file na lokalnym klonie)
-6. Tytuły YT ZAWSZE aktualizuj razem z opisem (videos.update?part=snippet wymaga obu pól)
+6. llm_provider=**claude**, publication_type=**full_analysis**, portal_id=**UUID** (nie string!)
+7. YT access_token: przez SSH + `_build_credentials` (NIE przez /v1/youtube/channels)
+8. biblia_full_pipeline.py wymaga aktualizacji do v2 (patrz biblia_backlog_pipeline.py jako wzór)
