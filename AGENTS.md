@@ -3,7 +3,7 @@
 Reguły specyficzne dla workspace `media-dispatch`.
 Uzupełnia `RULE[user_global]` — nie zastępuje.
 
-> Ostatnia aktualizacja: 2026-08-29 | Supervisor 01
+> Ostatnia aktualizacja: 2026-08-30 | media-strateg
 
 ---
 
@@ -114,5 +114,90 @@ Przed pierwszym `run_command` lub wywołaniem VSE API:
 
 ---
 
+## DISPATCH PROTOCOL — zasady przekazywania wiedzy
+
+> Dodane: 2026-08-30 | media-strateg — lekcja z sesji backlog 28-29.08
+
+### Zasada naczelna: wiedza w dispatchu, nie odkrywana przez workera
+
+Worker NIE szuka tokenów, dostępów ani procedur na własną rękę.
+Supervisor dostarcza gotowe narzędzia i wiedzę — worker wykonuje.
+
+### Hierarchia źródeł wiedzy (kiedy Supervisor czegoś nie wie)
+
+Jeśli brakuje informacji do dispatchu — szukaj w tej kolejności:
+
+```
+1. .agents/knowledge/         ← konstytucje workerów, recepty, pułapki
+2. agents/*/scripts/          ← gotowe skrypty z poprzednich sesji (WZORZEC!)
+3. .agents/reports/           ← raporty z poprzednich sesji
+4. .agents/tasks/CURRENT_BRIEF.md ← ostatni znany stan projektu
+5. heartbeat.json             ← co zrobiła poprzednia sesja
+```
+
+NIE zaczynaj od zera gdy istnieje wcześniejszy skrypt robiący to samo.
+
+### Co musi zawierać dobry dispatch
+
+```
+## KONTEKST (kopiuj z wiedzy, nie każ workerowi szukać)
+- Gotowy skrypt lub referencja do istniejącego
+- Znane komendy (SSH pattern, API endpoints)
+- Parametry specyficzne dla zadania (video_id, daty, portal_id)
+- Lokalizacja plików wejściowych
+
+## ZADANIE (precyzyjne, bez eksploracji)
+- Jedna główna komenda lub sekwencja kroków
+- Oczekiwany output
+- Co zrobić przy błędzie
+
+## ⚠️ ZNANE PUŁAPKI (z konstytucji)
+- Kopiuj bezpośrednio z vse-worker-constitution.md sekcja 7
+```
+
+### Self-contained scripts — wzorzec
+
+Kiedy worker musi wykonać pipeline:
+- Skrypt pobiera własne tokeny na starcie (subprocess SSH dla JWT)
+- Wszystkie parametry hardcoded w CONFIG sekcji
+- Worker dostaje jedną komendę: `python skrypt.py`
+- Wzorzec: `agents/vse-worker/scripts/biblia_backlog_pipeline.py`
+
+### Odkładanie wiedzy przez workera
+
+Worker po zakończeniu zadania POWINIEN zaktualizować:
+- `.agents/knowledge/` — jeśli odkrył nową pułapkę lub wzorzec
+- `.agents/reports/` — raport z wynikami (dual-write do sonic-void)
+- Istniejący skrypt w `agents/*/scripts/` — jeśli naprawił bug lub dodał feature
+
+Worker MOŻE odkładać tymczasową wiedzę w scratch swojego workspace
+(np. zapisane tokeny do ponownego użycia w tej samej sesji).
+
+### Anty-wzorzec (czego NIE robić)
+
+❌ Dispatch: "pobierz JWT token" → worker szuka jak to zrobić  
+✅ Dispatch: "uruchom `python biblia_backlog_pipeline.py` — skrypt sam pobiera token przez SSH"
+
+❌ Dispatch: "sprawdź konfigurację YT w VSE"  
+✅ Dispatch: "kanał Prawy Biblijny, konto tobroz@gmail.com, playlista PLw7UeigJuyWkUzzvhS1vZX0H251raaYa7"
+
+❌ Worker odkrywa strukturę API metodą prób i błędów  
+✅ Worker dostaje referencję do `vse-worker-constitution.md sekcja 3`
+
+---
+
+## Pre-flight checklist dla media-dev / media-deploy
+
+Przed pierwszym `run_command` lub wywołaniem VSE API:
+
+1. Przeczytaj `vse-worker-constitution.md` — zwłaszcza sekcję **Znane Pułapki**
+2. Sprawdź czy masz działający JWT token (weryfikacja: `GET /v1/users/me`)
+3. Token generuj przez `jose.jwt.encode()` wewnątrz `vse-api` — NIE przez `create_access_token()`
+4. Dla skryptów z SQL lub złożonym escapingiem: `write_to_file` → `scp` → `ssh bash /tmp/skrypt.sh`
+5. SCP — zawsze pełne ścieżki Windows (nie `~`)
+
+---
+
 *Inicjacja: media-dev-01 | 28.08.2026*  
-*Rozbudowa: Supervisor 01 | sonic-void | 29.08.2026 — VSE infra, kanały, pre-flight*
+*Rozbudowa: Supervisor 01 | sonic-void | 29.08.2026 — VSE infra, kanały, pre-flight*  
+*Rozbudowa: media-strateg | 30.08.2026 — Dispatch Protocol, self-contained scripts, hierarchia wiedzy*
