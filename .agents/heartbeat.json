@@ -1,17 +1,18 @@
 {
   "callsign": "media-strateg",
-  "status": "working",
-  "current_task": "Briefing read, planning next session tasks",
-  "timestamp": "2026-08-30T10:53:00+02:00",
+  "status": "done",
+  "current_task": "Backlog 28.08 + 29.08 — Pipeline A z antydatowaniem",
+  "timestamp": "2026-08-30T12:12:00+02:00",
   "last_completed": [
-    "Sesja 29-30.08: 7 filmów biblijnych (30.08-05.09.2026) — pełny pipeline A",
-    "Konstytucja workera: .agents/knowledge/vse-worker-constitution.md",
-    "Prawy TV standard pipeline — szkielet: prawy_standard_pipeline.py",
-    "Fix tytułów YT dla 6 filmów"
+    "Biblia 28.08.2026 — WP #125317, YT S69T_H-DJy4 public — commit c988796",
+    "Biblia 29.08.2026 — WP #125322, YT HaY1VnzG_3o public — commit c988796",
+    "Konstytucja v2: 4 nowe pułapki (claude/full_analysis/UUID/YT SSH) — commit 9faf113",
+    "AGENTS.md Dispatch Protocol — commit 56b691d",
+    "CURRENT_BRIEF zaktualizowany"
   ],
   "pending": [
-    "Napisy VTT dla filmów 28.08 i 29.08 — nie zrealizowane w poprzedniej sesji",
-    "Weryfikacja postów na prawy.pl (schema VideoObject w source)",
-    "Implementacja Pipeline B (prawy_standard_pipeline.py) — szkielet gotowy, pełna implementacja pending"
+    "QA prawy.pl — weryfikacja schema VideoObject w source (9 postów)",
+    "Pipeline B — Prawy TV standard pipeline (prawy_standard_pipeline.py)",
+    "biblia_full_pipeline.py — update do v2 (claude/full_analysis/UUID)"
   ]
 }
