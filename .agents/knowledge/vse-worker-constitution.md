@@ -1,13 +1,13 @@
 # VSE Worker Constitution (media-dispatch)
 
-> Ostatnia aktualizacja: 2026-08-30 | Supervisor 01 (sesja live + analiza architektoniczna)
+> Ostatnia aktualizacja: 2026-08-30 | media-strateg (sesja backlog 28-29.08 — 4 nowe pułapki)
 
 Dokument opisuje zasady operacyjne dla workerów z rodziny `vse-worker`.
 Zawiera wiedzę zdobytą zarówno z poprzednich sesji jak i weryfikacji live 29-30.08.2026.
 
 ---
 
-## 1. Środowisko VSE
+## 1. Środowidko VSE
 
 | Element | Wartość |
 |---------|--------|
@@ -18,7 +18,7 @@ Zawiera wiedzę zdobytą zarówno z poprzednich sesji jak i weryfikacji live 29-
 | Container Web | `vse-web` |
 | DB credentials | user=`vse`, db=`vse` |
 | VPS | `ubuntu@147.224.162.100` |
-| SSH key (pełna ścieżka Windows) | `C:\Users\tomas2\.ssh\oracle-crimson.key` |
+| SSH key (pełna ścieżka Windows) | `C:\\Users\\tomas2\\.ssh\\oracle-crimson.key` |
 | Dashboard | `https://vse.impresjapr.pl/dashboard` |
 
 ---
@@ -39,6 +39,22 @@ payload = {
 }
 print(jwt.encode(payload, secret, algorithm='HS256'))
 "
+```
+
+Lub przez subprocess z poziomu skryptu Python:
+```python
+cmd = [
+    "ssh", "-i", SSH_KEY, "-o", "StrictHostKeyChecking=no", VPS,
+    "docker exec vse-api python3 -c \""
+    "import os,datetime; from jose import jwt; "
+    "s=os.environ.get('JWT_SECRET_KEY',''); "
+    "p={'sub':'4b97ab0c-98ee-46c6-9be8-d86adc4cb38a',"
+    "'exp':datetime.datetime.utcnow()+datetime.timedelta(hours=24)}; "
+    "print(jwt.encode(p,s,algorithm='HS256'))"
+    "\""
+]
+r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+token = r.stdout.strip()
 ```
 
 ### Konto administratora
@@ -64,12 +80,29 @@ curl -s -H "Authorization: Bearer TOKEN" http://localhost:8085/v1/users/me
 /v1/generate                ← YouTube URL → SEO (z thumbnail, VideoObject schema)
 /v1/inject                  ← wstrzyknij schema do WP
 /v1/jobs/{job_id}/vtt       ← pobierz VTT z joba
-/v1/youtube/channels        ← lista kanałów konta OAuth
+/v1/youtube/channels        ← lista kanałów konta OAuth (metadane, BEZ access_token!)
 /v1/youtube/oauth/login     ← link do reautoryzacji OAuth
 /v1/youtube/publish-description  ← update opisu na YT
 /v1/youtube/channels/{channel_id}/playlists
 /v1/portals                 ← config portali WP (credentials)
 /health
+```
+
+### Parametry /v1/generate i /v1/inject
+
+```python
+# POPRAWNE wartości (zweryfikowane 30.08.2026)
+llm_provider = "claude"          # NIE "gemini" — VPS ma ANTHROPIC_API_KEY
+publication_type = "full_analysis"  # NIE "film" — patrz lista poniżej
+portal_id = "2b047d7d-15a1-4d2f-8463-f89c2275bb73"  # UUID prawy.pl — NIE string "prawy"
+
+# Dostępne publication_type:
+# full_analysis, analiza, news, explainer, wywiad, poradnik, felieton, reportaz
+```
+
+### Portal UUID prawy.pl
+```
+prawy.pl → portal_id = "2b047d7d-15a1-4d2f-8463-f89c2275bb73"
 ```
 
 ---
@@ -88,7 +121,7 @@ VSE ma DWA tryby pracy. **Wyłącznie YouTube pipeline daje pełny wynik.**
 | Embed YouTube w artykule | ❌ BRAK | ✅ automatyczny |
 | video_url w DB | `audio://audio_XXXXX` | `youtube://{video_id}` |
 
-### ✅ Prawidłowy flow dla kanału bez auto-napisów (np. YT nie rozpoznał języka)
+### ✅ Prawidłowy flow dla kanału bez auto-napisków (np. YT nie rozpoznał języka)
 
 ```
 Krok 1: MP3 → POST /v1/audio/generate → dostać VTT z transkrypcją
@@ -140,16 +173,20 @@ requests.post(
 - **Cel:** TYLKO transkrypcja — używaj VTT, ignoruj artykuł (będzie generowany potem przez YT pipeline)
 - **Timeout:** 600s (8-min audio ≈ 2-3 min processing)
 - **VTT:** w `schema_data` lub przez `/v1/jobs/{job_id}/vtt`
+- **llm_provider:** `"claude"` (NIE `"gemini"` — brak GEMINI_API_KEY na VPS!)
 
 ```python
 resp = requests.post(
     "https://vse.impresjapr.pl/v1/audio/generate",
     headers={"Authorization": "Bearer TOKEN"},
     files={"file": (mp3_path.name, open(mp3_path, "rb"), "audio/mpeg")},
-    data={"lang": "pl", "llm_provider": "gemini"},
+    data={"lang": "pl", "llm_provider": "claude"},  # claude, nie gemini!
     timeout=600,
 )
 vtt_text = resp.json()["schema_data"].get("vtt") or resp.json()["schema_data"].get("transcript")
+# Jeśli brak VTT w schema_data, pobierz przez SSH:
+# media_id = resp.json()["schema_data"].get("media_id")
+# docker exec vse-api cat /tmp/{media_id}.vtt
 ```
 
 ---
@@ -167,9 +204,49 @@ Jeśli YouTube API zwraca `invalid_grant` → token wygasł.
 NIE próbuj naprawiać przez kod. Zgroś bloker do Supervisora.
 User musi otworzyć: `https://vse.impresjapr.pl/v1/youtube/oauth/login` i zatwierdzić dostęp.
 
+### ⚠️ Pułapka: `/v1/youtube/channels` NIE zwraca access_token
+
+Endpoint `/v1/youtube/channels` zwraca tylko metadane kanałów (id, title, stats). **NIE ma tam access_token.**
+
+Aby pobrać aktywny token OAuth do bezpośredniego wywołania YT API — użyj SSH + docker exec:
+
+```python
+code = (
+    "import asyncio\n"
+    "from api.db import AsyncSessionLocal\n"
+    "from api.models.youtube_channel import YouTubeChannel\n"
+    "from api.core.youtube_publish import _build_credentials\n"
+    "from google.auth.transport.requests import Request\n"
+    "from sqlalchemy.future import select\n"
+    "import json\n"
+    "async def main():\n"
+    "    async with AsyncSessionLocal() as db:\n"
+    "        res = await db.execute(select(YouTubeChannel).where(YouTubeChannel.is_active == True))\n"
+    "        out = []\n"
+    "        for ch in res.scalars().all():\n"
+    "            try:\n"
+    "                creds = _build_credentials(ch)\n"
+    "                creds.refresh(Request())\n"
+    "                out.append({'id': str(ch.id), 'channel_id': ch.youtube_channel_id, 'title': ch.title, 'token': creds.token})\n"
+    "            except Exception as e:\n"
+    "                pass\n"
+    "        print(json.dumps(out))\n"
+    "asyncio.run(main())\n"
+)
+cmd = ["ssh", "-i", SSH_KEY, "-o", "StrictHostKeyChecking=no", VPS,
+       f"docker exec -w /app vse-api python3 -c {subprocess.list2cmdline([code])}"]
+r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+tokens = json.loads([l for l in r.stdout.strip().split('\n') if l.startswith('[')][-1])
+# tokens = [{'id': ..., 'channel_id': ..., 'title': ..., 'token': 'ya29...'}]
+```
+
+Kanały z aktywnymi tokenami (zweryfikowane 30.08.2026):
+- `Studio Prawy_PL` → channel_id: `UCoH2G9By4OX3kcLsc8lHgDw`
+- `Prawy TV` → channel_id: `UCNXh5eIlMVxnUBpTMKUp4CA`
+
 ---
 
-## 7. Znane Pułapki — sesja 29-30.08.2026 (live)
+## 7. Znane Pułapki — pełna lista
 
 | # | Pułapka | Rozwiązanie |
 |---|---------|-------------|
@@ -177,12 +254,16 @@ User musi otworzyć: `https://vse.impresjapr.pl/v1/youtube/oauth/login` i zatwie
 | 2 | URL: `/v1/` nie `/api/v1/` | Publiczny: `https://vse.impresjapr.pl/v1/...` |
 | 3 | `create_access_token()` psuje się | Używaj `jose.jwt.encode()` z `JWT_SECRET_KEY` |
 | 4 | SQL przez SSH z PS | Skrypt bash → `write_to_file` → `scp` pełna ścieżka → `ssh bash /tmp/...` |
-| 5 | SCP `~` na Windows | Pełna ścieżka: `C:\Users\tomas2\...` |
+| 5 | SCP `~` na Windows | Pełna ścieżka: `C:\\Users\\tomas2\\...` |
 | 6 | Whisper timeout | timeout=600s, nie przerywaj |
 | 7 | Audio pipeline ≠ pełny pipeline | Patrz sekcja 4 — architektura flow |
 | 8 | `invalid_grant` YT OAuth | Nie naprawiaj kodem, zgłoś do Supervisora |
 | 9 | PS interpoluje `$variable` w SSH | Używaj `'apostrofów'` lub skryptu bash |
 | 10 | Kanał biblijny config | W DB VSE (OAuth), nie w YAML. YAML-e są developerskie |
+| 11 | **LLM provider: `gemini` nie działa** | VPS ma tylko `ANTHROPIC_API_KEY`. Używaj `llm_provider="claude"` |
+| 12 | **`publication_type: "film"` → HTTP 422** | Dostępne: `full_analysis`, `analiza`, `news`, `explainer`, `wywiad`, `poradnik`, `felieton`, `reportaz` |
+| 13 | **`portal_id: "prawy"` nie działa** | Musi być UUID: `portal_id="2b047d7d-15a1-4d2f-8463-f89c2275bb73"` |
+| 14 | **`/v1/youtube/channels` nie zwraca access_token** | Używaj SSH + `_build_credentials(ch).refresh()` — patrz sekcja 6 |
 
 ---
 
@@ -203,9 +284,21 @@ print(jwt.encode(payload, secret, algorithm='HS256'))
 
 ### Poprawny SCP (Windows → VPS)
 ```powershell
-scp -i C:\Users\tomas2\.ssh\oracle-crimson.key -o StrictHostKeyChecking=no `
-  "C:\Users\tomas2\.gemini\antigravity\playground\sonic-void\tmp\skrypt.sh" `
+scp -i C:\\Users\\tomas2\\.ssh\\oracle-crimson.key -o StrictHostKeyChecking=no `
+  "C:\\Users\\tomas2\\.gemini\\antigravity\\playground\\sonic-void\\tmp\\skrypt.sh" `
   ubuntu@147.224.162.100:/tmp/skrypt.sh
+```
+
+### Poprawne wywołanie /v1/generate
+```python
+r = requests.post(f"{VSE_BASE}/v1/generate", headers=vsh(vse_token), json={
+    "video_url": f"https://www.youtube.com/watch?v={video_id}",
+    "publication_type": "full_analysis",   # NIE "film"
+    "portal_id": "2b047d7d-15a1-4d2f-8463-f89c2275bb73",  # UUID, nie string
+    "post_title": title,
+    "lang": "pl",
+    "llm_provider": "claude"               # NIE "gemini"
+}, timeout=300)
 ```
 
 ---
@@ -217,14 +310,16 @@ scp -i C:\Users\tomas2\.ssh\oracle-crimson.key -o StrictHostKeyChecking=no `
 | Kanał | Prawy Biblijny |
 | Konto | tobroz@gmail.com (ten sam OAuth co Prawy TV) |
 | Playlista Ewangelia | `PLw7UeigJuyWkUzzvhS1vZX0H251raaYa7` |
-| Typ publikacji WP | `film` |
-| Lang | `pl` | LLM | `gemini` |
+| Typ publikacji WP | `full_analysis` (NIE `film`!) |
+| Lang | `pl` | LLM | `claude` (NIE `gemini`!) |
 | Publish time | 00:00 CEST (`+02:00`) danego dnia |
-| Pliki lokalne | `C:\Users\tomas2\Videos\Prawy\Biblia [data]\` (MP3 + MP4) |
-| Thumbnails lokalne | `D:\Biblioteki\prawy video\Biblia\Biblia [data]\` |
+| Pliki lokalne | `C:\\Users\\tomas2\\Videos\\Prawy\\Biblia [data]\\` (MP3 + MP4) |
+| Thumbnails lokalne | `D:\\Biblioteki\\prawy video\\Biblia\\Biblia [data]\\` |
+| Portal UUID | `2b047d7d-15a1-4d2f-8463-f89c2275bb73` |
 
 ---
 
 *[media-strateg-01 | media-dispatch 29.08.2026 — init]*  
 *[Supervisor 01 | sonic-void 29.08.2026 — pułapki live]*  
-*[Supervisor 01 | sonic-void 30.08.2026 — architektura audio vs YT pipeline, OAuth rotation, retrofitting thumbnails]*
+*[Supervisor 01 | sonic-void 30.08.2026 — architektura audio vs YT pipeline, OAuth rotation, retrofitting thumbnails]*  
+*[media-strateg | media-dispatch 30.08.2026 — pułapki 11-14: llm_provider=claude, publication_type=full_analysis, portal_id UUID, YT token przez SSH _build_credentials]*
