@@ -1,4 +1,4 @@
-# media-dispatch - ROADMAP v1.1
+# media-dispatch - ROADMAP v1.2
 
 ## Wizja
 
@@ -30,17 +30,20 @@ je na wiele platform jednoczesnie.
 - Silnik harmonogramowania publikacji (`shared/schedules/shorts_schedule.json`): ~6 shortów/film, rozkład na 2–6 dni, peak slots: `07:00`, `12:00`, `18:00`, `21:00` CEST
 - Integracja ze strukturą katalogów `C:\VSE\Shorts\[Film]_[date]\` (`*_raw.mp4` vs `*_gotowy.mp4`)
 
-### FAZA 2: Feed Crawler Worker
-- RSS z calego swiata -> baza tematow
-- Schema tematu: tytul, zrodlo, url, kategoria, relevance_score
-- Cron co 30 min
+### FAZA 2: Multi-portal Daily Production (Kurier365.pl, BiznesCiti.com, Prawy.pl)
+- **`gmail-kurier365-worker`** — monitoring skrzynki `tobroz@gmail.com`, filtrowanie i whitelist nadawców (Rudiński 2 adresy + `photo-curator`, Bińczyk 3 adresy, WEI, Biały Kruk).
+- **`feed-crawler-worker`** — agregacja RSS kluczowych działów: NAUKA, komunikaty urzędowe UOKiK, depesze ISBNews oraz działy ogólne (cron co 30 min).
+- **`newseria-connector`** — sesyjny scraping depesz i multimediów po zalogowaniu (login/hasło) z dedykowanym filtrem neutralności AI (`Eco-Bias Gate` dla BiznesCiti).
+- **`redaktor-naczelny-bot` (Telegram)** — kanał wewnętrzny z powiadomieniami push, prezentacja kandydatów z resume, linkiem i przyciskami inline `[Akceptuj] [Odrzuć] [Odrocz D+1/D+7] [Uwagi]`.
+- **`pressai-worker`** — rozszerzenie istniejącego workera o playbooki per portal, standard 5 bloków HTML/Schema i automatyczny drafting do WP REST API.
+- **`biznesciti-worker`** — dedykowany orkiestrator formatów B2B (analizy, explainery, geopolityka, benchmarking portali PL/EU/Azja).
 
 ### FAZA 3: Content Radar Worker
 - Google Trends API
 - Social media trending
 - Output: shared/topics/trending.json
 
-### FAZA 4: Redaktor Naczelny
+### FAZA 4: Redaktor Naczelny (Zaawansowana Meta-Orkiestracja)
 - Syntetyzuje dane z Intelligence
 - Proponuje tematy per portal
 - Po GO usera -> dispatch do producentow
@@ -68,13 +71,13 @@ Kazdy worker musi implementowac:
 ### Task schema
 ```json
 {
-  \"task_id\": \"uuid\",
-  \"type\": \"vse|pressai|shorts|publish|tiktok\",
-  \"portal_id\": \"uuid\",
-  \"input\": {},
-  \"priority\": 1,
-  \"scheduled_at\": \"ISO timestamp\",
-  \"created_by\": \"redaktor-naczelny|shorts-agent|user\"
+  "task_id": "uuid",
+  "type": "vse|pressai|shorts|publish|tiktok|gmail|feed_crawler",
+  "portal_id": "prawy|kurier365|biznesciti",
+  "input": {},
+  "priority": 1,
+  "scheduled_at": "ISO timestamp",
+  "created_by": "redaktor-naczelny|shorts-agent|user"
 }
 ```
 
@@ -82,6 +85,7 @@ Kazdy worker musi implementowac:
 1. VSE worker / prawy-studio-worker - zaimplementowany
 2. shorts-agent + Short Machine - API gotowe na produkcji od 31.08.2026 (`/v1/shorts/describe`), implementacja workers: Q1 09.2026
 3. pressAI worker - kluczowy dla skali
-4. Redaktor Naczelny - orkiestracja tematów
-5. Feed crawler - integracja z istniejacym projektem
-6. TikTok distribution - po walidacji flow _gotowy.mp4
+4. gmail-kurier365-worker + feed-crawler-worker - Ingest dla Kurier365 & BiznesCiti
+5. redaktor-naczelny-bot (Telegram) - orkiestracja i Human-in-the-Loop
+6. newseria-connector + biznesciti-worker
+7. TikTok distribution - po walidacji flow _gotowy.mp4
