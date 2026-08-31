@@ -1,14 +1,14 @@
 {
-  "callsign": "media-dev-12",
+  "callsign": "media-dev-14",
   "status": "done",
-  "current_task": "Aktualizacja dokumentacji i spec shorts-agent po wdrożeniu Short Machine API na produkcji",
-  "timestamp": "2026-08-31T23:07:30+02:00",
+  "current_task": "Opis i aktualizacja 8 shortów przez /v1/shorts/describe oraz YouTube Data API (Studio Prawy_PL)",
+  "timestamp": "2026-08-31T23:31:30+02:00",
   "last_completed": [
-    "Aktualizacja vse-worker-constitution.md o Short Machine API (POST /v1/shorts/describe) — commit 8a7c9b1 (2026-08-31)",
-    "Aktualizacja agents/shorts-agent/README.md o integrację Short Machine i flow detekcji — commit 2ef7ca2 (2026-08-31)",
-    "Aktualizacja ROADMAP.md o status Fazy 1b na produkcji — commit 70fd02d (2026-08-31)",
-    "Aktualizacja docs/shorts-pipeline-architecture.md — commit eaf9211 (2026-08-31)",
-    "Raport z wdrożenia Short Machine API (media-dispatch + sonic-void inbox) — commit 11626fe / ac4791a (2026-08-31)"
+    "Weryfikacja parametrów /v1/shorts/describe (start_sec, end_sec, youtube_id) w OpenAPI VSE",
+    "Zidentyfikowanie source_youtube_id i timestampów dla 8 gotowych shortów w bazie PostgreSQL VSE",
+    "Wygenerowanie metadanych SEO przez /v1/shorts/describe dla 8 shortów (100% OK)",
+    "Zaktualizowanie metadanych (tytuł max 45 zn, opis, tagi) na kanale YouTube Studio Prawy_PL z zachowaniem private",
+    "Raport wdrożeniowy (media-dispatch + sonic-void inbox) — commit ee42686 / 91b59ad (2026-08-31)"
   ],
   "pending": [
     "Implementacja shorts-agent workerów (Q1 09.2026)",
