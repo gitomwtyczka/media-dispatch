@@ -1,17 +1,16 @@
 {
-  "callsign": "media-dev-14",
-  "status": "done",
-  "current_task": "Opis i aktualizacja 8 shortów przez /v1/shorts/describe oraz YouTube Data API (Studio Prawy_PL)",
-  "timestamp": "2026-08-31T23:31:30+02:00",
+  "callsign": "media-dev-16",
+  "status": "working",
+  "current_task": "Publikacja filmu Helena Wolińska (cDMAe_wx_AU) na prawy.pl i YouTube + shorts pipeline",
+  "timestamp": "2026-09-01T00:32:00+02:00",
   "last_completed": [
-    "Weryfikacja parametrów /v1/shorts/describe (start_sec, end_sec, youtube_id) w OpenAPI VSE",
-    "Zidentyfikowanie source_youtube_id i timestampów dla 8 gotowych shortów w bazie PostgreSQL VSE",
-    "Wygenerowanie metadanych SEO przez /v1/shorts/describe dla 8 shortów (100% OK)",
-    "Zaktualizowanie metadanych (tytuł max 45 zn, opis, tagi) na kanale YouTube Studio Prawy_PL z zachowaniem private",
-    "Raport wdrożeniowy (media-dispatch + sonic-void inbox) — commit ee42686 / 91b59ad (2026-08-31)"
+    "Opis i aktualizacja 8 shortów przez /v1/shorts/describe oraz YouTube Data API (Studio Prawy_PL) — media-dev-14"
   ],
   "pending": [
-    "Implementacja shorts-agent workerów (Q1 09.2026)",
-    "Implementacja sheets-sync-worker (Google Sheets Editorial Control Center) — 01.09.2026"
+    "Krok 1: Sprawdzenie WP Post ID w transcript_jobs",
+    "Krok 2: Generowanie tokenu JWT",
+    "Krok 3: Publikacja WP post",
+    "Krok 4: Aktualizacja YouTube (tytuł + public)",
+    "Krok 5: Shorts pipeline (candidates, render, describe)"
   ]
 }
