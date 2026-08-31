@@ -1,20 +1,15 @@
 {
-  "callsign": "media-dev-09",
-  "status": "done",
-  "current_task": "Kompleksowy handoff sesji 31.08.2026 — stan publikacji, raporty, specyfikacje i plan na 01.09.2026",
-  "timestamp": "2026-08-31T22:00:30+02:00",
+  "callsign": "media-dev-10",
+  "status": "working",
+  "current_task": "Aktualizacja opisów i tytułów SEO 8 shortsów Studio Prawy_PL",
+  "timestamp": "2026-08-31T22:10:00+02:00",
   "last_completed": [
     "Handoff sesja 31.08.2026 (.agents/handoff/2026-08-31_media-strateg_handoff.md) — commit ff4731d",
     "Dual-write handoff do sonic-void inbox — commit 4195592",
-    "Płużański Rulewski (EnclbKLEDAA) — WP Draft #125372, YT unlisted, Shorts — commit 21a05fd",
-    "prawy-studio-worker MVP v1.0 — commit 32656ff",
-    "Mosiński 2 (zYcq-57Y0ts) — WP #125367 (future 02.09), YT unlisted — commit 4787634",
-    "Shorts candidates & render — 10 klipów w C:\\VSE\\Shorts — commit 4787634",
-    "Płużański Mosiński 1 (s6aGNXdtKpA) — WP #125353, YT public — commit ec5b0f1"
+    "Płużański Rulewski (EnclbKLEDAA) — WP Draft #125372, YT unlisted, Shorts — commit 21a05fd"
   ],
   "pending": [
-    "Implementacja sheets-sync-worker (Google Sheets Editorial Control Center) — 01.09.2026",
-    "Weryfikacja wyrenderowanych shortów Rulewskiego w C:\\VSE\\Shorts",
-    "Decyzja usera dot. publikacji Mosiński 2 i Rulewski"
+    "Aktualizacja opisów i tytułów SEO 8 shortsów Studio Prawy_PL",
+    "Próba ustawienia publishAt dla 3 wybranych shortsów"
   ]
 }
