@@ -1,18 +1,17 @@
 {
   "callsign": "media-dev-12",
-  "status": "working",
+  "status": "done",
   "current_task": "Aktualizacja dokumentacji i spec shorts-agent po wdrożeniu Short Machine API na produkcji",
-  "timestamp": "2026-08-31T23:06:00+02:00",
+  "timestamp": "2026-08-31T23:07:30+02:00",
   "last_completed": [
-    "Wdrożenie ostatecznych opisów SEO i harmonogramu 8 Shorts Studio Prawy_PL — commit 80b2b32 (2026-08-31)",
-    "Zaplanowanie TOP 3 na 01.09 (ioObSLpRGc4 07:00 CEST, FtQNSzHtQ0s 12:00 CEST, 9tjEXGE5sXg 18:00 CEST) — 100% sukces YouTube Data API",
-    "Dual-write raportu końcowego do sonic-void inbox — commit ef7f7c9 (2026-08-31)",
-    "Handoff sesja 31.08.2026 (.agents/handoff/2026-08-31_media-strateg_handoff.md) — commit ff4731d"
+    "Aktualizacja vse-worker-constitution.md o Short Machine API (POST /v1/shorts/describe) — commit 8a7c9b1 (2026-08-31)",
+    "Aktualizacja agents/shorts-agent/README.md o integrację Short Machine i flow detekcji — commit 2ef7ca2 (2026-08-31)",
+    "Aktualizacja ROADMAP.md o status Fazy 1b na produkcji — commit 70fd02d (2026-08-31)",
+    "Aktualizacja docs/shorts-pipeline-architecture.md — commit eaf9211 (2026-08-31)",
+    "Raport z wdrożenia Short Machine API (media-dispatch + sonic-void inbox) — commit 11626fe / ac4791a (2026-08-31)"
   ],
   "pending": [
-    "Aktualizacja vse-worker-constitution.md o Short Machine API",
-    "Aktualizacja agents/shorts-agent/README.md o integrację Short Machine",
-    "Aktualizacja ROADMAP.md o status Fazy 1b",
-    "Dual-write raportu z integracji Short Machine API"
+    "Implementacja shorts-agent workerów (Q1 09.2026)",
+    "Implementacja sheets-sync-worker (Google Sheets Editorial Control Center) — 01.09.2026"
   ]
 }
