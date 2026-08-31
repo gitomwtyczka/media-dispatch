@@ -1,13 +1,12 @@
 {
   "callsign": "media-dev-02",
-  "status": "working",
+  "status": "done",
   "current_task": "Pipeline VSE dla filmu Płużański Mosiński 1 (s6aGNXdtKpA) -> prawy.pl",
-  "timestamp": "2026-08-31T19:53:20+02:00",
+  "timestamp": "2026-08-31T19:59:10+02:00",
   "last_completed": [
+    "Płużański Mosiński 1 (s6aGNXdtKpA) — WP #125353, YT public — commit ec5b0f1",
     "Biblia 28.08.2026 — WP #125317, YT S69T_H-DJy4 public — commit c988796",
     "Biblia 29.08.2026 — WP #125322, YT HaY1VnzG_3o public — commit c988796"
   ],
-  "pending": [
-    "Płużański Mosiński 1 — VSE generate + inject prawy.pl + YT update"
-  ]
+  "pending": []
 }
