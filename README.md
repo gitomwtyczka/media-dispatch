@@ -13,7 +13,8 @@ RSS/Trends   meta-agent LLM      VSE/pressAI    YT/WP/TikTok
 
 | Worker | Opis | Status |
 |--------|------|--------|
-| vse-worker | Video SEO Engine pipeline | MVP |
+| vse-worker | Video SEO Engine pipeline (generic) | MVP |
+| prawy-studio-worker | Dedykowany pipeline Studio Prawy_PL | MVP v1.0 |
 | pressai-worker | Publikacja przez pressAI | Planowany |
 | feed-crawler-worker | RSS monitoring | Planowany |
 | content-radar-worker | Trendy | Planowany |
