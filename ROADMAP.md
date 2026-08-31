@@ -22,11 +22,12 @@ je na wiele platform jednoczesnie.
 - Wyjscie: artykul na portal WordPress
 - Mapowanie API pressAI
 
-### FAZA 1b: shorts-agent + Short Machine Integration
+### FAZA 1b: shorts-agent + Short Machine Integration (API gotowe na produkcji od 31.08.2026. Implementacja workers: Q1 09.2026)
 - Skanowanie opublikowanych shortów na kanale YouTube Studio Prawy_PL (`UCoH2G9By4OX3kcLsc8lHgDw`)
-- Audyt jakości SEO i automatyczne generowanie brakujących opisów przez **Short Machine** (`POST /v1/shorts/seo-description`)
-- Aktualizacja snippetu wideo (opis, hashtagi, tytuł, przypięty komentarz) przez YouTube Data API v3
-- Silnik harmonogramowania publikacji (`shared/schedules/shorts_schedule.json`): ~6 shortów/film, rozkład na 2–6 dni, peak slots: `07:00`, `12:00`, `18:00`, `21:00`
+- Audyt jakości SEO i automatyczne generowanie brakujących opisów przez **Short Machine** (`POST /v1/shorts/describe`)
+- Weryfikacja brakujących opisów SM: `description.length < 50` lub tytuł = nazwa pliku mp4
+- Aktualizacja snippetu wideo (zoptymalizowany tytuł max 45 zn bez #Shorts, opis 150–350 zn bez URL, max 5 hashtagów bez #Shorts, przypięty komentarz APV) przez YouTube Data API v3
+- Silnik harmonogramowania publikacji (`shared/schedules/shorts_schedule.json`): ~6 shortów/film, rozkład na 2–6 dni, peak slots: `07:00`, `12:00`, `18:00`, `21:00` CEST
 - Integracja ze strukturą katalogów `C:\VSE\Shorts\[Film]_[date]\` (`*_raw.mp4` vs `*_gotowy.mp4`)
 
 ### FAZA 2: Feed Crawler Worker
@@ -67,19 +68,19 @@ Kazdy worker musi implementowac:
 ### Task schema
 ```json
 {
-  "task_id": "uuid",
-  "type": "vse|pressai|shorts|publish|tiktok",
-  "portal_id": "uuid",
-  "input": {},
-  "priority": 1,
-  "scheduled_at": "ISO timestamp",
-  "created_by": "redaktor-naczelny|shorts-agent|user"
+  \"task_id\": \"uuid\",
+  \"type\": \"vse|pressai|shorts|publish|tiktok\",
+  \"portal_id\": \"uuid\",
+  \"input\": {},
+  \"priority\": 1,
+  \"scheduled_at\": \"ISO timestamp\",
+  \"created_by\": \"redaktor-naczelny|shorts-agent|user\"
 }
 ```
 
 ## Priorytety MVP
 1. VSE worker / prawy-studio-worker - zaimplementowany
-2. shorts-agent + Short Machine - specyfikacja gotowa, faza implementacji
+2. shorts-agent + Short Machine - API gotowe na produkcji od 31.08.2026 (`/v1/shorts/describe`), implementacja workers: Q1 09.2026
 3. pressAI worker - kluczowy dla skali
 4. Redaktor Naczelny - orkiestracja tematów
 5. Feed crawler - integracja z istniejacym projektem
