@@ -1,4 +1,4 @@
-# media-dispatch - ROADMAP v1.2
+# media-dispatch - ROADMAP v1.3
 
 ## Wizja
 
@@ -26,22 +26,45 @@ je na wiele platform jednoczesnie.
 - Skanowanie opublikowanych shortów na kanale YouTube Studio Prawy_PL (`UCoH2G9By4OX3kcLsc8lHgDw`)
 - Audyt jakości SEO i automatyczne generowanie brakujących opisów przez **Short Machine** (`POST /v1/shorts/describe`)
 - Weryfikacja brakujących opisów SM: `description.length < 50` lub tytuł = nazwa pliku mp4
-- Aktualizacja snippetu wideo (zoptymalizowany tytuł max 45 zn bez #Shorts, opis 150–350 zn bez URL, max 5 hashtagów bez #Shorts, przypięty komentarz APV) przez YouTube Data API v3
-- Silnik harmonogramowania publikacji (`shared/schedules/shorts_schedule.json`): ~6 shortów/film, rozkład na 2–6 dni, peak slots: `07:00`, `12:00`, `18:00`, `21:00` CEST
+- Aktualizacja snippetu wideo (zoptymalizowany tytuł max 45 zn bez #Shorts, opis 150-350 zn bez URL, max 5 hashtagów bez #Shorts, przypięty komentarz APV) przez YouTube Data API v3
+- Silnik harmonogramowania publikacji (`shared/schedules/shorts_schedule.json`): ~6 shortów/film, rozkład na 2-6 dni, peak slots: `07:00`, `12:00`, `18:00`, `21:00` CEST
 - Integracja ze strukturą katalogów `C:\VSE\Shorts\[Film]_[date]\` (`*_raw.mp4` vs `*_gotowy.mp4`)
 
 ### FAZA 2: Multi-portal Daily Production (Kurier365.pl, BiznesCiti.com, Prawy.pl)
-- **`gmail-kurier365-worker`** — monitoring skrzynki `tobroz@gmail.com`, filtrowanie i whitelist nadawców (Rudiński 2 adresy + `photo-curator`, Bińczyk 3 adresy, WEI, Biały Kruk).
-- **`feed-crawler-worker`** — agregacja RSS kluczowych działów: NAUKA, komunikaty urzędowe UOKiK, depesze ISBNews oraz działy ogólne (cron co 30 min).
-- **`newseria-connector`** — sesyjny scraping depesz i multimediów po zalogowaniu (login/hasło) z dedykowanym filtrem neutralności AI (`Eco-Bias Gate` dla BiznesCiti).
-- **`redaktor-naczelny-bot` (Telegram)** — kanał wewnętrzny z powiadomieniami push, prezentacja kandydatów z resume, linkiem i przyciskami inline `[Akceptuj] [Odrzuć] [Odrocz D+1/D+7] [Uwagi]`.
-- **`pressai-worker`** — rozszerzenie istniejącego workera o playbooki per portal, standard 5 bloków HTML/Schema i automatyczny drafting do WP REST API.
-- **`biznesciti-worker`** — dedykowany orkiestrator formatów B2B (analizy, explainery, geopolityka, benchmarking portali PL/EU/Azja).
+
+**✅ MVP v0.1 skeleton gotowy (31.08.2026) — media-dev-architect**
+
+Zaimplementowano rozszerzalną architekturę Plugin-based Workers:
+
+#### agents/base/ — bazowa architektura workerów
+- `worker_base.py` — WorkerBase, SourcePlugin, TrendSignal, ContentCandidate
+- `sources/gmail_source.py` — GmailSource (whitelist), RSSSource (feeds)
+- `sources/newseria_source.py` — NewseriaSource z Eco-Bias Gate
+- `trend_signals/content_radar_signal.py` — **LIVE** integracja z radar.impresjapr.pl
+- `trend_signals/google_trends_signal.py` — fallback placeholder
+
+#### agents/kurier365-worker/ — pierwsza instancja WorkerBase
+- `worker.py` — Kurier365Worker (kurier365.pl)
+  - Sources: Gmail (Rudziński, Bińczyk, WEI, Biały Kruk), RSS (UOKiK, PAP, Nauka, ISBNews), Newseria
+  - Trend Signals: ContentRadarSignal (LIVE gdy CONTENT_RADAR_JWT), Google/Social (fallback)
+  - CLI: --health, --run, --top N, --json
+
+#### Następne kroki w Fazie 2:
+- **`gmail-kurier365-worker`** — aktywacja GmailSource (token PressAI + PressAI Gmail API)
+- **`feed-crawler-worker`** — implementacja RSSSource (feedparser lub feed-crawler serwis)
+- **`newseria-connector`** — implementacja scraping sesyjny Newseria
+- **`redaktor-naczelny-bot` (Telegram)** — implementacja process() z inline buttons
+- **`biznesciti-worker`** — nowa instancja WorkerBase dla biznesciti.com
+- **`pressai-worker`** — rozszerzenie o playbooki per portal
 
 ### FAZA 3: Content Radar Worker
-- Google Trends API
-- Social media trending
-- Output: shared/topics/trending.json
+- **GOTOWE na produkcji (31.08.2026)** — radar.impresjapr.pl
+- Google Trends API (pytrends, geo=PL, 7d)
+- Social media trending (Twitter/X, TikTok, Instagram, YouTube, Reddit, FB, LinkedIn)
+- APScheduler co 15 min
+- Viral Score: `views*0.1 + likes*1.0 + shares*3.0 + comments*2.0 + GT_boost`
+- Integracja: `ContentRadarSignal` w `agents/base/trend_signals/`
+- Endpoint: `GET /api/v1/trending/global` (wymaga JWT + plan Pro)
 
 ### FAZA 4: Redaktor Naczelny (Zaawansowana Meta-Orkiestracja)
 - Syntetyzuje dane z Intelligence
@@ -85,7 +108,8 @@ Kazdy worker musi implementowac:
 1. VSE worker / prawy-studio-worker - zaimplementowany
 2. shorts-agent + Short Machine - API gotowe na produkcji od 31.08.2026 (`/v1/shorts/describe`), implementacja workers: Q1 09.2026
 3. pressAI worker - kluczowy dla skali
-4. gmail-kurier365-worker + feed-crawler-worker - Ingest dla Kurier365 & BiznesCiti
-5. redaktor-naczelny-bot (Telegram) - orkiestracja i Human-in-the-Loop
-6. newseria-connector + biznesciti-worker
-7. TikTok distribution - po walidacji flow _gotowy.mp4
+4. **kurier365-worker skeleton v0.1** - architektura gotowa (31.08.2026), aktywacja źrodet: Faza 2
+5. Content Radar (radar.impresjapr.pl) - LIVE na produkcji (31.08.2026)
+6. redaktor-naczelny-bot (Telegram) - orkiestracja i Human-in-the-Loop
+7. newseria-connector + biznesciti-worker
+8. TikTok distribution - po walidacji flow _gotowy.mp4
