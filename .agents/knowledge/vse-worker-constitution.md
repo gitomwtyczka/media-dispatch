@@ -1,13 +1,13 @@
 # VSE Worker Constitution (media-dispatch)
 
-> Ostatnia aktualizacja: 2026-08-30 | media-strateg (sesja backlog 28-29.08 — 4 nowe pułapki)
+> Ostatnia aktualizacja: 2026-08-31 | media-dev-12 (wdrożenie Short Machine API /v1/shorts/describe)
 
 Dokument opisuje zasady operacyjne dla workerów z rodziny `vse-worker`.
-Zawiera wiedzę zdobytą zarówno z poprzednich sesji jak i weryfikacji live 29-30.08.2026.
+Zawiera wiedzę zdobytą zarówno z poprzednich sesji jak i weryfikacji live 29-31.08.2026.
 
 ---
 
-## 1. Środowidko VSE
+## 1. Środowisko VSE
 
 | Element | Wartość |
 |---------|--------|
@@ -73,13 +73,14 @@ curl -s -H "Authorization: Bearer TOKEN" http://localhost:8085/v1/users/me
 
 ---
 
-## 3. API Routes — kluczowe (29.08.2026)
+## 3. API Routes — kluczowe (31.08.2026)
 
 ```
 /v1/audio/generate          ← MP3 → Whisper → SEO (bez thumbnail!)
 /v1/generate                ← YouTube URL → SEO (z thumbnail, VideoObject schema)
 /v1/inject                  ← wstrzyknij schema do WP
 /v1/jobs/{job_id}/vtt       ← pobierz VTT z joba
+/v1/shorts/describe         ← Short Machine SEO (youtube_id + portal_id)
 /v1/youtube/channels        ← lista kanałów konta OAuth (metadane, BEZ access_token!)
 /v1/youtube/oauth/login     ← link do reautoryzacji OAuth
 /v1/youtube/publish-description  ← update opisu na YT
@@ -201,7 +202,7 @@ vtt_text = resp.json()["schema_data"].get("vtt") or resp.json()["schema_data"].g
 
 ### ⚠️ Pułapka: `invalid_grant`
 Jeśli YouTube API zwraca `invalid_grant` → token wygasł.
-NIE próbuj naprawiać przez kod. Zgroś bloker do Supervisora.
+NIE próbuj naprawiać przez kod. Zgłoś bloker do Supervisora.
 User musi otworzyć: `https://vse.impresjapr.pl/v1/youtube/oauth/login` i zatwierdzić dostęp.
 
 ### ⚠️ Pułapka: `/v1/youtube/channels` NIE zwraca access_token
@@ -246,7 +247,39 @@ Kanały z aktywnymi tokenami (zweryfikowane 30.08.2026):
 
 ---
 
-## 7. Znane Pułapki — pełna lista
+## 7. Short Machine API (produkcja od 31.08.2026)
+
+Endpoint: POST /v1/shorts/describe
+Auth: ten sam Bearer JWT co reszta VSE
+
+Input:
+```json
+{
+  "youtube_id": "ABC123",
+  "portal_id": "2b047d7d-15a1-4d2f-8463-f89c2275bb73"
+}
+```
+
+Output:
+```json
+{
+  "optimized_title": "max 45 znaków, front-loaded",
+  "description": "150-350 znaków, bez URL, słowa kluczowe z transkrypcji",
+  "hashtags": ["#tag1", "#tag2"],  // max 5, bez #Shorts
+  "pinned_comment": "Pytanie polaryzujące do pinowania",
+  "related_video_id": "YT ID powiązanego materiału"
+}
+```
+
+Znane pułapki:
+- Bez #Shorts w hashtagach (YouTube dodaje automatycznie dla video < 60s)
+- Bez URLów w description (blokuje reach)
+- optimized_title max 45 znaków (nie 70!)
+- Pinned comment dodaj przez YouTube Comments API (commentsInsert)
+
+---
+
+## 8. Znane Pułapki — pełna lista
 
 | # | Pułapka | Rozwiązanie |
 |---|---------|-------------|
@@ -264,10 +297,14 @@ Kanały z aktywnymi tokenami (zweryfikowane 30.08.2026):
 | 12 | **`publication_type: "film"` → HTTP 422** | Dostępne: `full_analysis`, `analiza`, `news`, `explainer`, `wywiad`, `poradnik`, `felieton`, `reportaz` |
 | 13 | **`portal_id: "prawy"` nie działa** | Musi być UUID: `portal_id="2b047d7d-15a1-4d2f-8463-f89c2275bb73"` |
 | 14 | **`/v1/youtube/channels` nie zwraca access_token** | Używaj SSH + `_build_credentials(ch).refresh()` — patrz sekcja 6 |
+| 15 | **Brak `#Shorts` w hashtagach/tytule** | YouTube taguje Shorty automatycznie (<60s, 9:16). Nie marnuj znaków |
+| 16 | **Brak URL w opisie Shorta** | Linki w Shortach są nieklikalne i ucinają zasięg. Używaj `related_video_id` |
+| 17 | **Długość `optimized_title` max 45 zn** | Tytuły >45 znaków ucinają się na smartfonach |
+| 18 | **Przypinanie komentarza Shorts** | Używaj Comments API (`commentThreads.insert` / `commentsInsert`) dla `pinned_comment` |
 
 ---
 
-## 8. Wzorce Kodu
+## 9. Wzorce Kodu
 
 ### Generowanie tokenu JWT (niezawodny)
 ```python
@@ -301,9 +338,19 @@ r = requests.post(f"{VSE_BASE}/v1/generate", headers=vsh(vse_token), json={
 }, timeout=300)
 ```
 
+### Poprawne wywołanie Short Machine (/v1/shorts/describe)
+```python
+r = requests.post(f"{VSE_BASE}/v1/shorts/describe", headers=vsh(vse_token), json={
+    "youtube_id": video_id,
+    "portal_id": "2b047d7d-15a1-4d2f-8463-f89c2275bb73"
+}, timeout=60)
+data = r.json()
+# data -> {"optimized_title": "...", "description": "...", "hashtags": [...], "pinned_comment": "...", "related_video_id": "..."}
+```
+
 ---
 
-## 9. Kanały Biblijne — wiedza operacyjna
+## 10. Kanały Biblijne — wiedza operacyjna
 
 | Element | Wartość |
 |---------|--------|
@@ -322,4 +369,5 @@ r = requests.post(f"{VSE_BASE}/v1/generate", headers=vsh(vse_token), json={
 *[media-strateg-01 | media-dispatch 29.08.2026 — init]*  
 *[Supervisor 01 | sonic-void 29.08.2026 — pułapki live]*  
 *[Supervisor 01 | sonic-void 30.08.2026 — architektura audio vs YT pipeline, OAuth rotation, retrofitting thumbnails]*  
-*[media-strateg | media-dispatch 30.08.2026 — pułapki 11-14: llm_provider=claude, publication_type=full_analysis, portal_id UUID, YT token przez SSH _build_credentials]*
+*[media-strateg | media-dispatch 30.08.2026 — pułapki 11-14: llm_provider=claude, publication_type=full_analysis, portal_id UUID, YT token przez SSH _build_credentials]*  
+*[media-dev-12 | media-dispatch 31.08.2026 — sekcja Short Machine API (/v1/shorts/describe) na produkcji, pułapki 15-18]*
