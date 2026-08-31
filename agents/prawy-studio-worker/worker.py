@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 prawy-studio-worker — Dedykowany worker dla Studio Prawy_PL
-media-dispatch | media-dev-04 | 31.08.2026
+media-dispatch | media-dev-06 | 31.08.2026
 
 Pipeline: generate_token -> check_captions -> generate SEO -> inject WP -> yt_update -> shorts
 
@@ -40,11 +40,16 @@ LOCAL_VIDEO_DIR = r"C:\Users\tomas2\Videos\Prawy"
 OUTPUT_DIR = r"C:\VSE\Shorts"
 STATE_FILE = Path(__file__).parent / "batch_progress.json"
 
+# ⛔ REGUŁA: domyślny status zawsze draft (WP) i unlisted (YT)
+# Publikowanie tylko na jawną dyspozycję użytkownika lub zatwierdzone w arkuszu
+DEFAULT_WP_STATUS = "draft"
+DEFAULT_YT_STATUS = "unlisted"
+
 # Pipeline defaults
 LLM_PROVIDER = "claude"          # VPS ma tylko ANTHROPIC_API_KEY!
 PUBLICATION_TYPE = "full_analysis"  # NIE 'film'!
 LANG = "pl"
-DEFAULT_POST_STATUS = "future"
+DEFAULT_POST_STATUS = DEFAULT_WP_STATUS
 
 # Retry
 MAX_RETRIES = 3
