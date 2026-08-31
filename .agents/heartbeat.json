@@ -1,18 +1,13 @@
 {
-  "callsign": "media-strateg",
-  "status": "done",
-  "current_task": "Backlog 28.08 + 29.08 — Pipeline A z antydatowaniem",
-  "timestamp": "2026-08-30T12:12:00+02:00",
+  "callsign": "media-dev-02",
+  "status": "working",
+  "current_task": "Pipeline VSE dla filmu Płużański Mosiński 1 (s6aGNXdtKpA) -> prawy.pl",
+  "timestamp": "2026-08-31T19:53:20+02:00",
   "last_completed": [
     "Biblia 28.08.2026 — WP #125317, YT S69T_H-DJy4 public — commit c988796",
-    "Biblia 29.08.2026 — WP #125322, YT HaY1VnzG_3o public — commit c988796",
-    "Konstytucja v2: 4 nowe pułapki (claude/full_analysis/UUID/YT SSH) — commit 9faf113",
-    "AGENTS.md Dispatch Protocol — commit 56b691d",
-    "CURRENT_BRIEF zaktualizowany"
+    "Biblia 29.08.2026 — WP #125322, YT HaY1VnzG_3o public — commit c988796"
   ],
   "pending": [
-    "QA prawy.pl — weryfikacja schema VideoObject w source (9 postów)",
-    "Pipeline B — Prawy TV standard pipeline (prawy_standard_pipeline.py)",
-    "biblia_full_pipeline.py — update do v2 (claude/full_analysis/UUID)"
+    "Płużański Mosiński 1 — VSE generate + inject prawy.pl + YT update"
   ]
 }
