@@ -1,17 +1,16 @@
 {
   "callsign": "media-dev-03",
-  "status": "working",
-  "current_task": "Sprawdzenie Śliwki, pipeline Mosiński 2, identyfikacja Płużański Rulewski, shorts candidates",
-  "timestamp": "2026-08-31T21:05:00+02:00",
+  "status": "done",
+  "current_task": "Pipeline Mosiński 2 (WP #125367 + YT), sprawdzenie Śliwki, shorts Mosiński 1 & 2 (10 klipów wyrenderowanych)",
+  "timestamp": "2026-08-31T21:26:00+02:00",
   "last_completed": [
+    "Mosiński 2 (zYcq-57Y0ts) — WP #125367 (future 02.09), YT public — commit 4787634",
+    "Shorts candidates & render — 10 klipów (Mosiński 1 & 2) w C:\\VSE\\Shorts — commit 4787634",
     "Płużański Mosiński 1 (s6aGNXdtKpA) — WP #125353, YT public — commit ec5b0f1",
     "Biblia 28.08.2026 — WP #125317, YT S69T_H-DJy4 public — commit c988796",
     "Biblia 29.08.2026 — WP #125322, YT HaY1VnzG_3o public — commit c988796"
   ],
   "pending": [
-    "Zadanie A: Sprawdź Śliwkę (yQ-Q_YrleLE)",
-    "Zadanie B: Mosiński 2 (zYcq-57Y0ts) pipeline",
-    "Zadanie C: Płużański Rulewski YT ID + pipeline",
-    "Zadanie D: Shorts candidates dla dzisiejszych filmów"
+    "Płużański Rulewski (EnclbKLEDAA) — oczekiwanie na potwierdzenie startu"
   ]
 }
