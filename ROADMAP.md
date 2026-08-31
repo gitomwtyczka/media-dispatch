@@ -1,4 +1,4 @@
-# media-dispatch - ROADMAP v1.0
+# media-dispatch - ROADMAP v1.1
 
 ## Wizja
 
@@ -14,13 +14,20 @@ je na wiele platform jednoczesnie.
 
 ### FAZA 0: Fundament (teraz)
 - Repo + workspace + AGENTS.md
-- Migracja batch_vse_pipeline.py jako agents/vse-worker/
+- Migracja batch_vse_pipeline.py jako agents/vse-worker/ (oraz prawy-studio-worker)
 - Wspolny API client shared/api_clients/
 
 ### FAZA 1: pressAI Worker
 - Wejscia: email, URL, tekst
 - Wyjscie: artykul na portal WordPress
 - Mapowanie API pressAI
+
+### FAZA 1b: shorts-agent + Short Machine Integration
+- Skanowanie opublikowanych shortów na kanale YouTube Studio Prawy_PL (`UCoH2G9By4OX3kcLsc8lHgDw`)
+- Audyt jakości SEO i automatyczne generowanie brakujących opisów przez **Short Machine** (`POST /v1/shorts/seo-description`)
+- Aktualizacja snippetu wideo (opis, hashtagi, tytuł, przypięty komentarz) przez YouTube Data API v3
+- Silnik harmonogramowania publikacji (`shared/schedules/shorts_schedule.json`): ~6 shortów/film, rozkład na 2–6 dni, peak slots: `07:00`, `12:00`, `18:00`, `21:00`
+- Integracja ze strukturą katalogów `C:\VSE\Shorts\[Film]_[date]\` (`*_raw.mp4` vs `*_gotowy.mp4`)
 
 ### FAZA 2: Feed Crawler Worker
 - RSS z calego swiata -> baza tematow
@@ -43,6 +50,12 @@ je na wiele platform jednoczesnie.
 - TikTok worker: shorty z VSE
 - Telegram worker: bot API
 
+### FAZA 5b: TikTok Upload (Gotowe Shorty _gotowy.mp4)
+- Integracja `tiktok-worker` z lokalną bazą wideo `C:\VSE\Shorts\`
+- Quality Gate: publikacja wyłącznie plików ze statusem/sufiksem `*_gotowy.mp4` po akceptacji człowieka
+- Wykorzystanie pakietów SEO (hook, opis, hashtagi) wygenerowanych przez Short Machine
+- Realizacja publikacji zgodnie z harmonogramem `shorts_schedule.json`
+
 ## Standardy techniczne
 
 ### Agent interface
@@ -52,18 +65,22 @@ Kazdy worker musi implementowac:
 - get_status() -> WorkerStatus
 
 ### Task schema
+```json
 {
-  task_id: uuid,
-  type: vse|pressai|shorts|publish,
-  portal_id: uuid,
-  input: {},
-  priority: 1-5,
-  scheduled_at: ISO timestamp,
-  created_by: redaktor-naczelny|user
+  "task_id": "uuid",
+  "type": "vse|pressai|shorts|publish|tiktok",
+  "portal_id": "uuid",
+  "input": {},
+  "priority": 1,
+  "scheduled_at": "ISO timestamp",
+  "created_by": "redaktor-naczelny|shorts-agent|user"
 }
+```
 
 ## Priorytety MVP
-1. VSE worker - juz gotowy, do migracji
-2. pressAI worker - kluczowy dla skali
-3. Redaktor Naczelny - nawet bez feed-crawlera
-4. Feed crawler - integracja z istniejacym projektem
+1. VSE worker / prawy-studio-worker - zaimplementowany
+2. shorts-agent + Short Machine - specyfikacja gotowa, faza implementacji
+3. pressAI worker - kluczowy dla skali
+4. Redaktor Naczelny - orkiestracja tematów
+5. Feed crawler - integracja z istniejacym projektem
+6. TikTok distribution - po walidacji flow _gotowy.mp4
