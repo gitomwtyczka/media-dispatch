@@ -3,7 +3,7 @@
 Reguły specyficzne dla workspace `media-dispatch`.
 Uzupełnia `RULE[user_global]` — nie zastępuje.
 
-> Ostatnia aktualizacja: 2026-08-30 | media-strateg
+> Ostatnia aktualizacja: 2026-08-31 | media-dev-06
 
 ---
 
@@ -88,6 +88,31 @@ Konfiguracja kanałów w **bazie danych VSE** — nie w plikach YAML.
 | Portal | URL | portal_id w VSE |
 |--------|-----|----------------|
 | Prawy.pl | https://prawy.pl | `prawy` |
+
+---
+
+## ⛔ REGUŁA PUBLIKOWANIA — BEZWZGLĘDNA
+
+Żaden materiał NIE może zostać opublikowany (status: publish/public/future) bez:
+1. Jawnego zatwierdzenia w arkuszu Google Sheets (kolumna Status = 'Zatwierdź'), LUB
+2. Jawnego komunikatu od użytkownika z nazwą materiału i datą publikacji.
+
+DOMYŚLNY STATUS zawsze:
+- WordPress: `draft`
+- YouTube: `unlisted`
+
+WYJĄTEK: tylko gdy użytkownik poda explicite "opublikuj", "publish", "live" lub konkretną datę publikacji przy zleceniu.
+
+Naruszenie tej reguły = błąd krytyczny wymagający natychmiastowego rewertu.
+
+---
+
+## Short Machine
+- Short Machine = część VSE, będzie niezależnym modułem z własnym API
+- Mieszka w video-seo-engine, rozwija się jako osobny serwis
+- Integracja przez API endpoint (do ustalenia gdy API będzie gotowe)
+- Shorty na YouTube: upload ręczny przez użytkownika z Premiere Pro
+- TikTok: upload ręczny z Premiere Pro, opisy przez Short Machine (roadmap)
 
 ---
 
@@ -186,18 +211,7 @@ Worker MOŻE odkładać tymczasową wiedzę w scratch swojego workspace
 
 ---
 
-## Pre-flight checklist dla media-dev / media-deploy
-
-Przed pierwszym `run_command` lub wywołaniem VSE API:
-
-1. Przeczytaj `vse-worker-constitution.md` — zwłaszcza sekcję **Znane Pułapki**
-2. Sprawdź czy masz działający JWT token (weryfikacja: `GET /v1/users/me`)
-3. Token generuj przez `jose.jwt.encode()` wewnątrz `vse-api` — NIE przez `create_access_token()`
-4. Dla skryptów z SQL lub złożonym escapingiem: `write_to_file` → `scp` → `ssh bash /tmp/skrypt.sh`
-5. SCP — zawsze pełne ścieżki Windows (nie `~`)
-
----
-
 *Inicjacja: media-dev-01 | 28.08.2026*  
 *Rozbudowa: Supervisor 01 | sonic-void | 29.08.2026 — VSE infra, kanały, pre-flight*  
-*Rozbudowa: media-strateg | 30.08.2026 — Dispatch Protocol, self-contained scripts, hierarchia wiedzy*
+*Rozbudowa: media-strateg | 30.08.2026 — Dispatch Protocol, self-contained scripts, hierarchia wiedzy*  
+*Rozbudowa: media-dev-06 | 31.08.2026 — reguła publikowania bezwzględna, Short Machine*
