@@ -1,17 +1,14 @@
 {
-  "callsign": "media-dev-16",
+  "callsign": "media-dev-17",
   "status": "done",
-  "current_task": "Publikacja filmu Helena Wolińska (cDMAe_wx_AU) na prawy.pl i YouTube + shorts pipeline",
-  "timestamp": "2026-09-01T00:43:30+02:00",
+  "current_task": "Aktualizacja Google Sheets harmonogramu editorial (nowe kolumny + wiersze Lp 10-14)",
+  "timestamp": "2026-09-01T00:44:10+02:00",
   "last_completed": [
-    "Wstrzyknięcie artykułu do WordPress (prawy.pl) z zatwierdzonym tytułem — WP Post ID 125377 (https://prawy.pl/helena-wolinska-bestia-w-mundurze-i-morderca-gen-nila/)",
-    "Aktualizacja YouTube cDMAe_wx_AU na kanale Studio Prawy_PL — zmiana tytułu na 'Helena Wolińska: bestia w mundurze i morderca gen. Nila' oraz statusu na public",
-    "Zlecenie renderingu 4 topowych shorts do kolejki VSE /v1/shorts/render",
-    "Wygenerowanie metadanych SEO przez Short Machine API /v1/shorts/describe dla 4 shorts",
-    "Raport wdrożeniowy dual-write (media-dispatch + sonic-void inbox) — commit b564d00 / 4cb5557 (2026-09-01)"
+    "Weryfikacja credentials Google na Oracle VPS (Sheets API wyłączone w projekcie SA)",
+    "Implementacja modułu synchronizacji agents/sheets-sync-worker/update_editorial.py z obsługą gspread, SA, OAuth i dry-run",
+    "Wygenerowanie gotowego pliku CSV agents/sheets-sync-worker/editorial_schedule_Lp10-14.csv",
+    "Przygotowanie dokumentacji agents/sheets-sync-worker/README.md",
+    "Raport wdrożeniowy dual-write (media-dispatch + sonic-void inbox) — commit 2e4a0aa / 78297bd (2026-09-01)"
   ],
-  "pending": [
-    "Finalizacja renderingu 4 shorts w kolejce VSE",
-    "Publikacja wyrenderowanych shorts na YouTube po zakończeniu kolejki"
-  ]
+  "pending": []
 }
