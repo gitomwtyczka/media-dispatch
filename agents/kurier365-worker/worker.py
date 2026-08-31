@@ -7,11 +7,12 @@ media-dispatch | media-dev-architect | 31.08.2026
 Architektura rozszerzalna (plugin-based):
   Sources:
     - Gmail (tobroz@gmail.com) — Rudiński, Bińczyk, WEI, Biały Kruk
-    - RSS (UOKiK, Nauka w Polsce, PAP)
+    - RSS (UOKiK, Nauka w Polsce, PAP, ISBNews)
     - Newseria (gospodarka, konsument, prawo)
   Trend Signals:
-    - GoogleTrendsSignal (placeholder → content-radar Faza 3)
-    - SocialTrendsSignal (placeholder → content-radar Faza 3)
+    - ContentRadarSignal (radar.impresjapr.pl — LIVE)
+    - GoogleTrendsSignal (fallback placeholder)
+    - SocialTrendsSignal (fallback placeholder)
 
 CLI:
   python worker.py --health               # status wszystkich komponentów
@@ -20,12 +21,14 @@ CLI:
   python worker.py --run --json           # output jako JSON
 
 Status wdrożenia:
-  v0.1 skeleton — wszystkie źródła w placeholder mode.
-  Aktywacja: dodaj token PressAI i dane logowania w CONFIG.
+  v0.1 skeleton — wszystkie źródła w placeholder mode (fetch zwraca []).
+  Content Radar LIVE — aktywny gdy CONTENT_RADAR_JWT ustawiony.
+  Aktywacja źródeł: dodaj token PressAI i dane logowania w CONFIG.
 """
 import argparse
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -35,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from agents.base.worker_base import WorkerBase, ContentCandidate
 from agents.base.sources.gmail_source import GmailSource, RSSSource
 from agents.base.sources.newseria_source import NewseriaSource
+from agents.base.trend_signals.content_radar_signal import ContentRadarSignal
 from agents.base.trend_signals.google_trends_signal import GoogleTrendsSignal, SocialTrendsSignal
 
 # ---------------------------------------------------------------------------
@@ -63,13 +67,19 @@ CONFIG = {
     'portal': 'kurier365.pl',
     'pressai_url': 'https://press.impresjapr.pl',
     'state_file': str(Path(__file__).parent / 'kurier365_state.json'),
+
     # Token PressAI — uzupełnij przez docker exec lub secrets manager
-    'pressai_token': None,       # TODO: JWT token
+    'pressai_token': os.environ.get('PRESSAI_JWT'),  # lub ustaw wprost
+
     # Dane logowania Newseria — uzupełnij gdy konto gotowe
-    'newseria_username': None,   # TODO
-    'newseria_password': None,   # TODO
-    # content-radar URL — None dopóki Faza 3 nie gotowa
-    'content_radar_url': None,   # TODO: 'https://content-radar.impresjapr.pl'
+    'newseria_username': os.environ.get('NEWSERIA_USER'),
+    'newseria_password': os.environ.get('NEWSERIA_PASS'),
+
+    # Content Radar JWT — LIVE na radar.impresjapr.pl
+    # Uzyskaj przez: POST https://radar.impresjapr.pl/api/v1/auth/login
+    # Wymaga planu Pro lub Enterprise w Content Radar.
+    'content_radar_jwt': os.environ.get('CONTENT_RADAR_JWT'),
+    'content_radar_url': 'https://radar.impresjapr.pl',
 }
 
 # ---------------------------------------------------------------------------
@@ -82,7 +92,7 @@ class Kurier365Worker(WorkerBase):
 
     Pipeline:
         1. collect_candidates() — zbiera z Gmail + RSS + Newseria
-        2. enrich_with_trends() — ocenia trend_score (placeholder Google/Social)
+        2. enrich_with_trends() — ocenia trend_score przez Content Radar LIVE
         3. Kandydaci sortowani (priority DESC, trend_score DESC)
         4. process() — wysyła top kandydatów do Redaktora Naczelnego (Telegram bot)
 
@@ -90,7 +100,7 @@ class Kurier365Worker(WorkerBase):
         from agents.base.sources.moj_source import MojSource
         self.add_source(MojSource(portal='kurier365.pl', ...))
 
-    Dodawanie nowego sygnału trendow:
+    Dodawanie nowego sygnału trendów:
         from agents.base.trend_signals.moj_signal import MojSignal
         self.add_trend_signal(MojSignal(api_url=...))
     """
@@ -105,7 +115,8 @@ class Kurier365Worker(WorkerBase):
 
         pressai_url = effective_config['pressai_url']
         pressai_token = effective_config.get('pressai_token')
-        content_radar_url = effective_config.get('content_radar_url')
+        content_radar_jwt = effective_config.get('content_radar_jwt')
+        content_radar_url = effective_config.get('content_radar_url', 'https://radar.impresjapr.pl')
 
         # ------------------------------------------------------------------
         # Źródła (Sources)
@@ -153,18 +164,21 @@ class Kurier365Worker(WorkerBase):
         ))
 
         # ------------------------------------------------------------------
-        # Sygnały trendów (Placeholders — Faza 3)
+        # Sygnały trendów
         # ------------------------------------------------------------------
 
-        # GoogleTrends — aktywuje się gdy content-radar gotowy (content_radar_url != None)
-        self.add_trend_signal(GoogleTrendsSignal(
-            api_url=content_radar_url  # None = placeholder mode
+        # Content Radar — LIVE integracja z radar.impresjapr.pl
+        # Aktywna gdy CONTENT_RADAR_JWT jest ustawiony w środowisku.
+        # Wymaga planu Pro lub Enterprise w Content Radar.
+        self.add_trend_signal(ContentRadarSignal(
+            api_url=content_radar_url,
+            jwt_token=content_radar_jwt,  # None = tryb placeholder
         ))
 
-        # Social trends — j.w.
-        self.add_trend_signal(SocialTrendsSignal(
-            api_url=content_radar_url  # None = placeholder mode
-        ))
+        # GoogleTrends + Social — fallback placeholder
+        # (Content Radar już agreguje te dane — te pluginy jako backup)
+        self.add_trend_signal(GoogleTrendsSignal())
+        self.add_trend_signal(SocialTrendsSignal())
 
     def process(self, candidate: ContentCandidate) -> dict:
         """Wyślij kandydata do Redaktora Naczelnego (Telegram bot).
@@ -180,16 +194,6 @@ class Kurier365Worker(WorkerBase):
         Returns:
             Dict z wynikiem: {'status': str, 'candidate_id': str}
         """
-        # TODO: Faza 2
-        # import requests
-        # resp = requests.post(
-        #     f"{self.config['telegram_bot_url']}/api/candidate",
-        #     json=candidate.to_dict(),
-        #     timeout=10
-        # )
-        # resp.raise_for_status()
-        # return resp.json()
-
         log.info("process() placeholder: candidate %s '%s'", candidate.id, candidate.title[:50])
         return {'status': 'placeholder_sent_to_editor', 'candidate_id': candidate.id}
 
@@ -208,6 +212,12 @@ Przykłady:
   python worker.py --run
   python worker.py --run --top 5
   python worker.py --run --json
+
+Zmienne środowiskowe:
+  PRESSAI_JWT          — JWT token PressAI
+  NEWSERIA_USER        — login Newseria
+  NEWSERIA_PASS        — hasło Newseria
+  CONTENT_RADAR_JWT    — JWT token Content Radar (radar.impresjapr.pl)
 """
     )
     parser.add_argument('--health', action='store_true', help='Status komponentów workera')
@@ -227,9 +237,12 @@ Przykłady:
             print(f"State file: {status['state_file']}")
             print("Sources:")
             for s in status['sources']:
-                icon = '✅' if s['healthy'] else '❌'
+                icon = '✅' if s['healthy'] else '❌ (placeholder)'
                 print(f"  {icon} {s['name']}")
-            print(f"Trend signals: {', '.join(status['trend_signals']) or 'none'}")
+            signals = status['trend_signals']
+            print(f"Trend signals: {', '.join(signals) if signals else 'none'}")
+            cr_jwt = os.environ.get('CONTENT_RADAR_JWT')
+            print(f"Content Radar JWT: {'SET (✅ LIVE)' if cr_jwt else 'NOT SET (⚠️ trends disabled)'}")
         return
 
     if args.run:
