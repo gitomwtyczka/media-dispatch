@@ -1,16 +1,14 @@
 {
-  "callsign": "media-dev-16",
+  "callsign": "media-dev-17",
   "status": "working",
-  "current_task": "Publikacja filmu Helena Wolińska (cDMAe_wx_AU) na prawy.pl i YouTube + shorts pipeline",
-  "timestamp": "2026-09-01T00:32:00+02:00",
+  "current_task": "Aktualizacja Google Sheets harmonogramu editorial (nowe kolumny + wiersze Lp 10-14)",
+  "timestamp": "2026-09-01T00:40:50+02:00",
   "last_completed": [
-    "Opis i aktualizacja 8 shortów przez /v1/shorts/describe oraz YouTube Data API (Studio Prawy_PL) — media-dev-14"
+    "Publikacja filmu Helena Wolińska (cDMAe_wx_AU) na prawy.pl i YouTube + shorts pipeline — media-dev-16"
   ],
   "pending": [
-    "Krok 1: Sprawdzenie WP Post ID w transcript_jobs",
-    "Krok 2: Generowanie tokenu JWT",
-    "Krok 3: Publikacja WP post",
-    "Krok 4: Aktualizacja YouTube (tytuł + public)",
-    "Krok 5: Shorts pipeline (candidates, render, describe)"
+    "Weryfikacja credentials Google Sheets na VPS",
+    "Aktualizacja arkusza Google Sheets lub Plan B (skrypt Python + CSV)",
+    "Raport końcowy do parent agenta"
   ]
 }
