@@ -1,0 +1,79 @@
+{
+  "_comment": "Skopiuj ten plik jako config.json i dostosuj do swojego srodowiska",
+
+  "vse": {
+    "url": "https://vse.impresjapr.pl",
+    "_comment_url": "Publiczny URL VSE API"
+  },
+
+  "portal": {
+    "id": "2b047d7d-15a1-4d2f-8463-f89c2275bb73",
+    "_comment_id": "UUID portalu prawy.pl w bazie VSE — NIE string 'prawy'"
+  },
+
+  "youtube": {
+    "channel_id": "UCoH2G9By4OX3kcLsc8lHgDw",
+    "_comment_channel_id": "Channel ID Studio Prawy_PL"
+  },
+
+  "ssh": {
+    "host": "ubuntu@147.224.162.100",
+    "key": "C:\\Users\\tomas2\\.ssh\\oracle-crimson.key",
+    "_comment_key": "Pelna sciezka Windows do klucza SSH — nie uzywaj ~"
+  },
+
+  "docker": {
+    "container": "vse-api",
+    "_comment_container": "Nazwa kontenera Docker z VSE API"
+  },
+
+  "auth": {
+    "user_id": "4b97ab0c-98ee-46c6-9be8-d86adc4cb38a",
+    "_comment_user_id": "UUID administratora VSE (tobroz@gmail.com)",
+    "token_ttl_hours": 24,
+    "_comment_token_ttl": "Czas waznosci tokenu JWT w godzinach"
+  },
+
+  "paths": {
+    "local_video_dir": "C:\\Users\\tomas2\\Videos\\Prawy",
+    "_comment_local_video_dir": "Katalog lokalny z plikami wideo/audio",
+    "output_dir": "C:\\VSE\\Shorts",
+    "_comment_output_dir": "Katalog wyjsciowy dla shortow",
+    "state_file": "batch_progress.json",
+    "_comment_state_file": "Plik checkpointu — wzgledna sciezka od worker.py"
+  },
+
+  "pipeline": {
+    "llm_provider": "claude",
+    "_comment_llm": "Musi byc 'claude' — VPS ma tylko ANTHROPIC_API_KEY",
+    "publication_type": "full_analysis",
+    "_comment_pub_type": "Dostepne: full_analysis, analiza, news, explainer, wywiad, poradnik, felieton, reportaz. NIE 'film'!",
+    "lang": "pl",
+    "default_post_status": "future",
+    "_comment_status": "Mozliwe: draft, future, publish",
+    "shorts_count_emotional": 5,
+    "shorts_count_professional": 5,
+    "shorts_top_n": 10,
+    "_comment_shorts": "Top N kandydatow po score trafi do renderowania"
+  },
+
+  "retry": {
+    "max_attempts": 3,
+    "delay_seconds": 10,
+    "_comment": "Retry logic dla kazdego kroku pipeline"
+  },
+
+  "captions": {
+    "poll_interval_seconds": 30,
+    "max_wait_minutes": 10,
+    "_comment": "Ile czekac na gotowsc napisow YT przed processingiem"
+  },
+
+  "timeouts": {
+    "generate_seconds": 300,
+    "inject_seconds": 120,
+    "shorts_candidates_seconds": 180,
+    "shorts_render_seconds": 30,
+    "ssh_seconds": 30
+  }
+}
