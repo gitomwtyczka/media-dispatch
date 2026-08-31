@@ -1,8 +1,8 @@
 {
-  "callsign": "media-dev-10",
-  "status": "done",
-  "current_task": "Wdrożenie zatwierdzonych przez usera tytułów, opisów SEO i harmonogramu 8 shortsów Studio Prawy_PL",
-  "timestamp": "2026-08-31T22:18:00+02:00",
+  "callsign": "media-dev-12",
+  "status": "working",
+  "current_task": "Aktualizacja dokumentacji i spec shorts-agent po wdrożeniu Short Machine API na produkcji",
+  "timestamp": "2026-08-31T23:06:00+02:00",
   "last_completed": [
     "Wdrożenie ostatecznych opisów SEO i harmonogramu 8 Shorts Studio Prawy_PL — commit 80b2b32 (2026-08-31)",
     "Zaplanowanie TOP 3 na 01.09 (ioObSLpRGc4 07:00 CEST, FtQNSzHtQ0s 12:00 CEST, 9tjEXGE5sXg 18:00 CEST) — 100% sukces YouTube Data API",
@@ -10,8 +10,9 @@
     "Handoff sesja 31.08.2026 (.agents/handoff/2026-08-31_media-strateg_handoff.md) — commit ff4731d"
   ],
   "pending": [
-    "Implementacja sheets-sync-worker (Google Sheets Editorial Control Center) — 01.09.2026",
-    "Weryfikacja wyrenderowanych shortów Rulewskiego w C:\\VSE\\Shorts",
-    "Decyzja usera dot. publikacji Mosiński 2 i Rulewski"
+    "Aktualizacja vse-worker-constitution.md o Short Machine API",
+    "Aktualizacja agents/shorts-agent/README.md o integrację Short Machine",
+    "Aktualizacja ROADMAP.md o status Fazy 1b",
+    "Dual-write raportu z integracji Short Machine API"
   ]
 }
