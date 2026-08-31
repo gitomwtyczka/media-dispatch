@@ -30,6 +30,13 @@ je na wiele platform jednoczesnie.
 - Silnik harmonogramowania publikacji (`shared/schedules/shorts_schedule.json`): ~6 shortów/film, rozkład na 2-6 dni, peak slots: `07:00`, `12:00`, `18:00`, `21:00` CEST
 - Integracja ze strukturą katalogów `C:\VSE\Shorts\[Film]_[date]\` (`*_raw.mp4` vs `*_gotowy.mp4`)
 
+### FAZA 1c: prawy-youtube-worker (Autonomiczny worker YT Studio Prawy_PL)
+- `prawy-youtube-worker v1.0 skeleton — 01.09.2026`
+- Integracja `YouTubeChannelSource` z `WorkerBase`
+- Pipeline VSE: `POST /v1/generate` -> `POST /v1/inject` (draft) -> `POST /v1/shorts/candidates`
+- Bezpieczeństwo i Human-in-the-Loop: WP=draft, YT=unlisted
+- Wzbogacanie trendami z Content Radar (`radar.impresjapr.pl`)
+
 ### FAZA 2: Multi-portal Daily Production (Kurier365.pl, BiznesCiti.com, Prawy.pl)
 
 **✅ MVP v0.1 skeleton gotowy (31.08.2026) — media-dev-architect**
@@ -40,6 +47,7 @@ Zaimplementowano rozszerzalną architekturę Plugin-based Workers:
 - `worker_base.py` — WorkerBase, SourcePlugin, TrendSignal, ContentCandidate
 - `sources/gmail_source.py` — GmailSource (whitelist), RSSSource (feeds)
 - `sources/newseria_source.py` — NewseriaSource z Eco-Bias Gate
+- `sources/youtube_channel_source.py` — YouTubeChannelSource dla monitorowania kanałów YT
 - `trend_signals/content_radar_signal.py` — **LIVE** integracja z radar.impresjapr.pl
 - `trend_signals/google_trends_signal.py` — fallback placeholder
 
@@ -48,6 +56,13 @@ Zaimplementowano rozszerzalną architekturę Plugin-based Workers:
   - Sources: Gmail (Rudziński, Bińczyk, WEI, Biały Kruk), RSS (UOKiK, PAP, Nauka, ISBNews), Newseria
   - Trend Signals: ContentRadarSignal (LIVE gdy CONTENT_RADAR_JWT), Google/Social (fallback)
   - CLI: --health, --run, --top N, --json
+
+#### agents/prawy-youtube-worker/ — dedykowany worker kanału YT Studio Prawy_PL
+- `worker.py` — PrawyYouTubeWorker (prawy.pl)
+  - Sources: YouTubeChannelSource (`UCoH2G9By4OX3kcLsc8lHgDw`)
+  - Trend Signals: ContentRadarSignal (LIVE gdy CONTENT_RADAR_JWT)
+  - Pipeline VSE: generate SEO -> inject WP draft -> shorts candidates -> editorial review
+  - CLI: --health, --video-id, --run
 
 #### Następne kroki w Fazie 2:
 - **`gmail-kurier365-worker`** — aktywacja GmailSource (token PressAI + PressAI Gmail API)
@@ -105,7 +120,7 @@ Kazdy worker musi implementowac:
 ```
 
 ## Priorytety MVP
-1. VSE worker / prawy-studio-worker - zaimplementowany
+1. VSE worker / prawy-studio-worker / prawy-youtube-worker v1.0 - zaimplementowany (01.09.2026)
 2. shorts-agent + Short Machine - API gotowe na produkcji od 31.08.2026 (`/v1/shorts/describe`), implementacja workers: Q1 09.2026
 3. pressAI worker - kluczowy dla skali
 4. **kurier365-worker skeleton v0.1** - architektura gotowa (31.08.2026), aktywacja źrodet: Faza 2
