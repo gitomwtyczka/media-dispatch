@@ -1,7 +1,7 @@
 # Architektura Shorts Pipeline — Studio Prawy_PL & media-dispatch
 
-> **Autor**: `media-analyst` | **Data**: 2026-08-31 | **Workspace**: `media-dispatch`  
-> **Status**: Specyfikacja Architektoniczna v1.0 | **Branch**: `main`
+> **Autor**: `media-analyst` / `media-dev-12` | **Data**: 2026-08-31 | **Workspace**: `media-dispatch`  
+> **Status**: Specyfikacja Architektoniczna v1.1 (Short Machine API /v1/shorts/describe na produkcji) | **Branch**: `main`
 
 ---
 
@@ -9,7 +9,7 @@
 
 Kanał **Studio Prawy_PL** (`UCoH2G9By4OX3kcLsc8lHgDw`) oraz portal **Prawy.pl** produkują codzienne materiały wideo (analizy polityczne, publicystykę, komentarze). Format długi (long-form wideo) jest fundamentem treści, jednak największy potencjał wiralowy oraz pozyskiwania nowych subskrybentów leży w formatach pionowych 9:16 (**YouTube Shorts** oraz **TikTok**).
 
-Niniejszy dokument opisuje kompletną, 4-agentową architekturę **Shorts Pipeline**: od wykrycia filmu z gotowymi napisami na YouTube, przez generowanie surowych klipów w VSE i obróbkę redakcyjną na PC, aż po optymalizację SEO przez moduł **Short Machine**, harmonogramowanie i publikację na TikToku.
+Niniejszy dokument opisuje kompletną, 4-agentową architekturę **Shorts Pipeline**: od wykrycia filmu z gotowymi napisami na YouTube, przez generowanie surowych klipów w VSE i obróbkę redakcyjną na PC, aż po optymalizację SEO przez moduł **Short Machine** (`POST /v1/shorts/describe`), harmonogramowanie i publikację na TikToku.
 
 ---
 
@@ -43,13 +43,13 @@ flowchart TD
 
     subgraph S4["4. Optimization & Scheduling"]
         SA["Agent 3: shorts-agent"]
-        SM["Short Machine<br/>(VSE SEO Description Engine)"]
+        SM["Short Machine<br/>(POST /v1/shorts/describe)"]
         YT_SHORTS["YouTube Shorts Channel"]
         
         SA -->|9. Skan opublikowanych shortów| YT_SHORTS
         SA -->|10. Wykrycie braku opisu SEO| SM
-        SM -->|11. Wygenerowany opis, tagi, hashtagi| SA
-        SA -->|12. YouTube Data API: update opisu| YT_SHORTS
+        SM -->|11. Wygenerowany opis, tagi, hashtagi, pinned comment| SA
+        SA -->|12. YouTube Data API: update opisu i przypięcie komentarza| YT_SHORTS
         SA -->|13. Generowanie kalendarza publikacji| SCHED["shared/schedules/shorts_schedule.json"]
     end
 
@@ -70,7 +70,7 @@ flowchart TD
 |---|---|---|---|---|
 | **Agent 1: `youtube-agent`** | Planowany (`media-dispatch`) | Monitorowanie kanału YT, gating gotowości transkrypcji (ASR), dispatch do VSE | YouTube Data API (`UCoH2G9By4OX3kcLsc8lHgDw`) | Taski przetwarzania dla VSE |
 | **Agent 2: `vse-worker`** | Istniejący (`prawy-studio-worker`) | Generowanie artykułu WP, SEO, kandydatów shortów Claude, renderowanie wideo 9:16 | YouTube URL / Video ID, audio/wideo | Artykuł WP, zaktualizowany film YT, pliki `_raw.mp4` w `C:\VSE\Shorts\` |
-| **Agent 3: `shorts-agent`** | Nowy (niniejsza specyfikacja) | Skanowanie opublikowanych shortów, generowanie opisów SEO (Short Machine), aktualizacja YT API, harmonogramowanie | Lista shortów YT, API Short Machine, konfiguracja slotów czasowych | Zaktualizowane opisy na YT, plik harmonogramu `shorts_schedule.json` |
+| **Agent 3: `shorts-agent`** | Specyfikacja gotowa, impl. Q1 09.2026 | Skanowanie opublikowanych shortów, generowanie opisów SEO (Short Machine `/v1/shorts/describe`), aktualizacja YT API, harmonogramowanie | Lista shortów YT, API Short Machine, konfiguracja slotów czasowych | Zaktualizowane opisy na YT, przypięte komentarze, plik harmonogramu `shorts_schedule.json` |
 | **Agent 4: `tiktok-worker`** | Planowany (Faza 5b) | Publikacja gotowych klipów pionowych na platformie TikTok | Pliki `*_gotowy.mp4`, metadane z Short Machine, harmonogram | Opublikowane wideo TikTok, logi publikacji |
 
 ---
@@ -99,9 +99,10 @@ flowchart TD
 - **Rola**: Strażnik optymalizacji SEO dla formatu krótkiego oraz planista publikacji.
 - **Działanie**:
   1. **Skanowanie YouTube**: Odpytuje YouTube Data API o opublikowane shorty na kanale Studio Prawy_PL.
-  2. **Audyt Opisów**: Sprawdza, czy dany Short posiada pełny opis SEO wygenerowany przez Short Machine.
-  3. **Wzbogacenie przez Short Machine**: Jeśli opis jest pusty lub szczątkowy $\rightarrow$ przesyła identyfikator shorta do Short Machine, pobiera zoptymalizowany pakiet SEO i aktualizuje wideo przez `videos.update`.
-  4. **Harmonogramowanie**: Na podstawie bazy zidentyfikowanych surowych/gotowych klipów (~6 z jednego filmu głównego) wylicza optymalny kalendarz dystrybucji na kolejne dni i godziny.
+  2. **Audyt Opisów**: Sprawdza, czy dany Short posiada pełny opis SEO wygenerowany przez Short Machine (`description.length < 50` lub tytuł tożsamy z nazwą pliku `.mp4`).
+  3. **Wzbogacenie przez Short Machine**: Jeśli opis jest pusty lub szczątkowy $\rightarrow$ przesyła `youtube_id` do `POST /v1/shorts/describe`, pobiera zoptymalizowany pakiet SEO i aktualizuje wideo przez `videos.update`.
+  4. **Przypięty Komentarz**: Wstawia `pinned_comment` przez `commentThreads.insert` i przypina go dla wymuszenia pętli retencji (APV).
+  5. **Harmonogramowanie**: Na podstawie bazy zidentyfikowanych surowych/gotowych klipów (~6 z jednego filmu głównego) wylicza optymalny kalendarz dystrybucji na kolejne dni i godziny (`07:00`, `12:00`, `18:00`, `21:00 CEST`).
 
 ---
 
@@ -141,39 +142,33 @@ C:\VSE\Shorts\
 ## 5. Short Machine — Koncepcja i Specyfikacja API
 
 ### 5.1. Czym jest Short Machine?
-**Short Machine** to dedykowany moduł optymalizacji SEO dla formatów pionowych (Shorts / Reels / TikTok). W przeciwieństwie do pełnego generatora artykułów VSE, Short Machine skupia się na:
-- **Hooku** (pierwsze 3 sekundy uwagi widza),
-- **Maksymalnie skondensowanym opisie** (zoptymalizowanym pod wyszukiwarkę Shorts i algorytm rekomendacji),
-- **Precyzyjnym zestawie hashtagów** (#Shorts, tagi kanału, tagi tematyczne),
-- **Przypiętym komentarzu (Pinned Comment CTA)** odsyłającym do pełnego filmu na YouTube lub artykułu na Prawy.pl.
+**Short Machine** to moduł produkcyjny VSE optymalizacji SEO dla formatów pionowych (Shorts / Reels / TikTok). Działa w kontenerze `vse-api` na porcie `8085` od 31.08.2026.
+Kluczowe założenia SEO 2026:
+- **Hook / Optimized Title**: Max 45 znaków, front-loaded, bez `#Shorts` (aby nie obcinać na smartfonach).
+- **Maksymalnie skondensowany opis**: 150–350 znaków, słowa kluczowe z transkrypcji, **BEZ URL** (linki w shortach są nieklikalne od 2023).
+- **Precyzyjny zestaw hashtagów**: Max 5 hashtagów tematycznych/kanałowych (BEZ `#Shorts`).
+- **Przypięty komentarz (Pinned Comment)**: Polaryzujące pytanie + call-to-action do powiązanego filmu (`related_video_id`), podbijające retencję (APV > 100%).
 
-### 5.2. Architektura i Endpointy API
-Short Machine może działać jako endpoint w `vse-api` (na porcie `8085`) lub jako mikromoduł w `media-dispatch`.
+### 5.2. Specyfikacja Endpointu Produkcyjnego
 
-#### Endpoint: `POST /v1/shorts/seo-description`
+#### Endpoint: `POST /v1/shorts/describe`
+- **Auth**: `Authorization: Bearer <jwt_token>` (ten sam co reszta VSE)
 - **Request Body**:
 ```json
 {
-  "youtube_id": "abc123shortId",
-  "parent_video_id": "xyz789longId",
-  "short_title": "Tytuł roboczy klipu",
-  "transcript_excerpt": "Tekst wypowiedzi w tym 45-sekundowym fragmencie...",
-  "target_platform": "youtube_shorts",
-  "lang": "pl"
+  "youtube_id": "ABC123defGH",
+  "portal_id": "2b047d7d-15a1-4d2f-8463-f89c2275bb73"
 }
 ```
 
 - **Response Body**:
 ```json
 {
-  "status": "success",
-  "seo_data": {
-    "optimized_title": "Mocne słowa o podatkach! Czy Polacy zapłacą więcej? #Shorts",
-    "description": "Gorąca dyskusja w Studio Prawy_PL. Zobacz kluczowy fragment rozmowy o nowych regulacjach.\n\n🔔 Subskrybuj kanał @StudioPrawy_PL aby nie przegapić nowych materiałów!\n\n#Shorts #PrawyPL #Polska #Gospodarka #Wiadomości",
-    "hashtags": ["#Shorts", "#PrawyPL", "#Polska", "#Gospodarka", "#Wiadomości"],
-    "tags": ["studio prawy pl", "prawy pl", "podatki", "gospodarka polska", "shorts"],
-    "pinned_comment": "👉 Całą rozmowę obejrzysz tutaj: https://www.youtube.com/watch?v=xyz789longId\n📰 Przeczytaj artykuł na: https://prawy.pl"
-  }
+  "optimized_title": "Mocne słowa o podatkach! Zapłacimy więcej?",
+  "description": "Gorąca dyskusja w Studio Prawy_PL o nowych regulacjach podatkowych i ich skutkach dla Polaków.\n\n🔔 Subskrybuj @StudioPrawy_PL!\n\n#PrawyPL #Podatki #Gospodarka #Polska #Wiadomości",
+  "hashtags": ["#PrawyPL", "#Podatki", "#Gospodarka", "#Polska", "#Wiadomości"],
+  "pinned_comment": "💬 Czy Twoim zdaniem nowe regulacje uderzą w Twój portfel? Napisz poniżej! 👇\n\n🎥 Całą rozmowę znajdziesz w powiązanym filmie!",
+  "related_video_id": "xyz789longId"
 }
 ```
 
@@ -213,9 +208,9 @@ Dla kanałów publicystyczno-informacyjnych w Polsce zdefiniowano 4 kluczowe slo
       "status": "scheduled",
       "platforms": ["youtube_shorts", "tiktok"],
       "seo": {
-        "title": "Kluczowy moment debaty! #Shorts",
+        "title": "Kluczowy moment debaty!",
         "description": "Zobacz najostrzejszy fragment wymiany zdań...",
-        "hashtags": ["#Shorts", "#PrawyPL", "#Media"]
+        "hashtags": ["#PrawyPL", "#Media", "#Polska"]
       }
     },
     {
@@ -227,9 +222,9 @@ Dla kanałów publicystyczno-informacyjnych w Polsce zdefiniowano 4 kluczowe slo
       "status": "pending_manual_edit",
       "platforms": ["youtube_shorts", "tiktok"],
       "seo": {
-        "title": "Co dalej z wolnością słowa? #Shorts",
+        "title": "Co dalej z wolnością słowa?",
         "description": "Mocny komentarz redakcji...",
-        "hashtags": ["#Shorts", "#PrawyPL", "#Polska"]
+        "hashtags": ["#PrawyPL", "#Polska", "#Opinie"]
       }
     }
   ]
@@ -242,8 +237,9 @@ Dla kanałów publicystyczno-informacyjnych w Polsce zdefiniowano 4 kluczowe slo
 
 1. **Model autoryzacji TikToka**: Czy `tiktok-worker` będzie korzystał z oficjalnego TikTok Content Posting API (wymaga konta deweloperskiego i weryfikacji aplikacji), czy z mechanizmu semi-automated (przygotowanie paczki w chmurze + notyfikacja)?
 2. **Kto publikuje Shorty na YouTube**: Czy shorty są wgrywane na YouTube ręcznie przez zespół, a `shorts-agent` je tylko wykrywa i uzupełnia opisy, czy `shorts-agent` docelowo ma sam wrzucać pliki wideo na YouTube Data API (`videos.insert`)?
-3. **Lokalizacja Short Machine**: Czy Short Machine ma być nowym endpointem w kontenerze `vse-api` (`/v1/shorts/seo-description`), czy osobnym mikroserwisem/modułem Python w repozytorium `media-dispatch`?
+3. **Automatyzacja Comments API**: Implementacja wstawiania i przypinania `pinned_comment` przez `commentThreads.insert` po publikacji shorta.
 
 ---
 
-*[media-analyst | media-dispatch 31.08.2026] — specyfikacja architektury kompletna*
+*[media-analyst | media-dispatch 31.08.2026] — specyfikacja architektury kompletna*  
+*[media-dev-12 | media-dispatch 31.08.2026] — aktualizacja: wdrożenie produkcyjne Short Machine API (/v1/shorts/describe)*
