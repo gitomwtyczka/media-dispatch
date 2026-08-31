@@ -1,16 +1,15 @@
 {
   "callsign": "media-dev-03",
   "status": "done",
-  "current_task": "Pipeline Mosiński 2 (WP #125367 + YT), sprawdzenie Śliwki, shorts Mosiński 1 & 2 (10 klipów wyrenderowanych)",
-  "timestamp": "2026-08-31T21:26:00+02:00",
+  "current_task": "Pipeline Mosiński 2 + Rulewski (WP Draft #125372 + YT unlisted), sprawdzenie Śliwki, shorts Mosiński 1, 2 i Rulewski (15 klipów)",
+  "timestamp": "2026-08-31T21:37:00+02:00",
   "last_completed": [
+    "Płużański Rulewski (EnclbKLEDAA) — WP Draft #125372, YT unlisted, Shorts — commit 21a05fd",
     "Mosiński 2 (zYcq-57Y0ts) — WP #125367 (future 02.09), YT public — commit 4787634",
     "Shorts candidates & render — 10 klipów (Mosiński 1 & 2) w C:\\VSE\\Shorts — commit 4787634",
     "Płużański Mosiński 1 (s6aGNXdtKpA) — WP #125353, YT public — commit ec5b0f1",
     "Biblia 28.08.2026 — WP #125317, YT S69T_H-DJy4 public — commit c988796",
     "Biblia 29.08.2026 — WP #125322, YT HaY1VnzG_3o public — commit c988796"
   ],
-  "pending": [
-    "Płużański Rulewski (EnclbKLEDAA) — oczekiwanie na potwierdzenie startu"
-  ]
+  "pending": []
 }
