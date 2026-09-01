@@ -1,5 +1,5 @@
 """
-FeedCrawlerSource v1.0 — Feed Crawler API Source Plugin
+FeedCrawlerSource v1.1 — Feed Crawler API Source Plugin
 Integracja z feed-crawler (13k+ RSS feedów, 5.9M+ artykułów)
 media-dispatch | media-dev-24 | 01.09.2026
 """
@@ -17,7 +17,7 @@ from agents.base.worker_base import SourcePlugin, ContentCandidate
 
 
 class FeedCrawlerSource(SourcePlugin):
-    """Źródło integrujące się z API feed-crawler (crawler.impresjapr.pl)."""
+    """Źródło integrujące się z API feed-crawler (crawler.impresjapr.pl / localhost:8002)."""
     name = 'feed_crawler'
 
     def __init__(
@@ -34,7 +34,7 @@ class FeedCrawlerSource(SourcePlugin):
         Args:
             api_url: Base URL do API feed-crawler (np. https://crawler.impresjapr.pl lub http://localhost:8002)
             portal: Nazwa docelowego portalu (np. kurier365, prawy)
-            categories: Opcjonalne słowa kluczowe lub kategorie
+            categories: Opcjonalne słowa kluczowe do filtrowania tematycznego
             departments: Opcjonalne działy w feed-crawler (np. ['konkurencja-biznes', 'nauka'])
             hours_back: Ile godzin wstecz uwzględniać
             limit: Maksymalna liczba artykułów do pobrania
@@ -61,7 +61,6 @@ class FeedCrawlerSource(SourcePlugin):
 
     def _save_seen(self) -> None:
         try:
-            # Zachowaj max 5000 ostatnich ID aby plik stanu nie rósł w nieskończoność
             seen_list = list(self._seen)
             if len(seen_list) > 5000:
                 seen_list = seen_list[-5000:]
@@ -83,7 +82,6 @@ class FeedCrawlerSource(SourcePlugin):
         summary = (item.get('summary') or '').lower()
         full_text = f"{title} {summary}"
 
-        # Priorytetyzacja wg tematów
         if any(k in full_text for k in ['uokik', 'konsument', 'prawo konsumenta', 'kara', 'decyzja']):
             return 9
         if any(k in full_text for k in ['pap', 'rpp', 'inflacja', 'stopy procentowe', 'podatk', 'ustawa', 'sejm']):
@@ -95,24 +93,37 @@ class FeedCrawlerSource(SourcePlugin):
         return 5
 
     def _http_get_json(self, url: str) -> Optional[dict]:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json'
+        }
+        # Próba 1: URL docelowy
         try:
-            req = urllib.request.Request(
-                url,
-                headers={'User-Agent': 'media-dispatch/1.0 (FeedCrawlerSource)'}
-            )
+            req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=15) as resp:
                 if resp.status == 200:
-                    data = resp.read().decode('utf-8')
-                    return json.loads(data)
+                    return json.loads(resp.read().decode('utf-8'))
         except Exception as e:
-            self.logger.error(f"Błąd zapytania HTTP do {url}: {e}")
+            self.logger.warning(f"Błąd zapytania HTTP do {url}: {e}")
+
+        # Próba 2: Fallback na localhost:8002 jeśli połączenie publiczne zwróciło błąd
+        if 'crawler.impresjapr.pl' in url:
+            fallback_url = url.replace('https://crawler.impresjapr.pl', 'http://localhost:8002')
+            try:
+                req = urllib.request.Request(fallback_url, headers=headers)
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    if resp.status == 200:
+                        return json.loads(resp.read().decode('utf-8'))
+            except Exception as e2:
+                self.logger.error(f"Błąd fallback HTTP do {fallback_url}: {e2}")
+
         return None
 
     def fetch(self) -> List[ContentCandidate]:
         candidates: List[ContentCandidate] = []
         raw_articles: List[dict] = []
 
-        # 1. Jeśli zdefiniowano konkretne działy, pobieraj przez /api/export?department=...
+        # 1. Pobieranie artykułów
         if self.departments:
             for dep in self.departments:
                 url = f"{self.api_url}/api/export?format=json&department={urllib.parse.quote(dep)}&limit={self.limit}"
@@ -120,7 +131,6 @@ class FeedCrawlerSource(SourcePlugin):
                 if data and 'articles' in data:
                     raw_articles.extend(data['articles'])
         else:
-            # Domyślnie pobierz z /api/articles lub /api/export
             url = f"{self.api_url}/api/articles?page=1&per_page={self.limit}"
             data = self._http_get_json(url)
             if data and 'articles' in data:
@@ -141,9 +151,9 @@ class FeedCrawlerSource(SourcePlugin):
             url = art.get('url') or ''
             pub_date = art.get('published_at') or art.get('fetched_at')
 
-            # Filtrowanie kategorii / słów kluczowych jeśli podano
+            # Filtrowanie kategorii jeśli zdefiniowano
             if self.categories:
-                text_to_match = f"{title} {summary}".lower()
+                text_to_match = f"{title} {summary} {feed_name}".lower()
                 if not any(cat in text_to_match for cat in self.categories):
                     continue
 
