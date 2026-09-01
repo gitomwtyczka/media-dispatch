@@ -221,6 +221,7 @@ def update_candidate_in_sheets(
     candidate_id: str,
     status: str = 'w produkcji',
     wp_url: str = '',
+    collab_link: str = '',
     spreadsheet_id: str = '1HMuODAIOG8e_9VH-HitdL_TwBRwgFZ0vnSKAW7Wmyig'
 ) -> bool:
     """Aktualizuje Status (kolumna L) i URL draftu WP (kolumna P) w Google Sheets."""
@@ -251,10 +252,11 @@ def update_candidate_in_sheets(
             return False
 
         row_idx = cell.row
-        # Kolumna L = 12 (Status), Kolumna P = 16 (URL draftu WP)
+        # Kolumna L = 12 (Status), Kolumna P = 16 (URL draftu WP), Kolumna Q = 17 (Collab link)
         updates = [
             {'range': f'L{row_idx}', 'values': [[status]]},
             {'range': f'P{row_idx}', 'values': [[wp_url or '']]},
+            {'range': f'Q{row_idx}', 'values': [[collab_link or '']]},
         ]
         ws.batch_update(updates, value_input_option='USER_ENTERED')
         log.info(f"Zaktualizowano wiersz {row_idx} w Sheets: Status='{status}', WP_URL='{wp_url}'")
@@ -506,6 +508,27 @@ class Kurier365Worker(WorkerBase):
             log.error(f"Błąd podczas publikacji WP draft: {e}")
         return None
 
+    def _generate_collab_link(self, post_id: int, email: str = "tobroz@gmail.com") -> str | None:
+        """Generate draft collab link via WP REST API."""
+        wp_user = os.environ.get("PRAWY_WP_USER", "")
+        wp_app_pass = os.environ.get("PRAWY_WP_APP_PASS", "")
+        if not wp_user or not wp_app_pass:
+            log.warning("PRAWY_WP_USER / PRAWY_WP_APP_PASS not set — skipping collab link")
+            return None
+        try:
+            import requests as req
+            r = req.post(
+                "https://prawy.pl/wp-json/draft-collab/v1/generate",
+                json={"post_id": post_id, "email": email, "expire_on_publish": True},
+                auth=(wp_user, wp_app_pass),
+                timeout=10,
+            )
+            r.raise_for_status()
+            return r.json().get("link")
+        except Exception as e:
+            log.warning(f"collab link generation failed: {e}")
+            return None
+
     def process(self, candidate: ContentCandidate) -> dict:
         """Przetwarzanie zatwierdzonego kandydata:
         1. Określ portal docelowy (_get_target_portal)
@@ -530,11 +553,14 @@ class Kurier365Worker(WorkerBase):
         # 3. Publikacja WP (tylko wyjątki)
         wp_url = ''
         wp_post_id = None
+        collab_link = ''
         if auto_publish:
             pub_res = self.publish_to_wp(candidate, generated, target_portal)
             if pub_res:
                 wp_url = pub_res.get('wp_url') or pub_res.get('post_url') or pub_res.get('url') or ''
                 wp_post_id = pub_res.get('wp_post_id') or pub_res.get('post_id')
+                if wp_post_id and target_portal == 'Prawy.pl':
+                    collab_link = self._generate_collab_link(wp_post_id)
         else:
             log.info(f"Artykuł {candidate.id} zapisany w historii PressAI — oczekuje na ręczne dodanie zdjęć i publikację.")
 
@@ -543,6 +569,7 @@ class Kurier365Worker(WorkerBase):
             candidate_id=candidate.id,
             status='w produkcji',
             wp_url=wp_url,
+            collab_link=collab_link,
             spreadsheet_id=self.spreadsheet_id
         )
 
