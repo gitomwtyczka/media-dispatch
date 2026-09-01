@@ -1,13 +1,13 @@
 {
-  "callsign": "media-dev-30",
+  "callsign": "media-dev-34",
   "status": "done",
-  "current_task": "Zaimplementuj GmailSource przez PressAI API",
-  "timestamp": "2026-09-01T11:51:40+02:00",
+  "current_task": "Poprawki do pipeline'u generowania + Sheets + docs",
+  "timestamp": "2026-09-01T12:41:00+02:00",
   "last_completed": [
-    "Implementacja GmailSource w agents/base/sources/gmail_source.py — commit 6d034212cfd557ebf9eb5a5b367e0507be9d4855 (2026-09-01)",
-    "Export pluginów w agents/base/sources/__init__.py — commit 75cde9ea1ca404bf9d9549e885c4d1171fe88bce (2026-09-01)",
-    "Integracja GmailSource w agents/kurier365-worker/worker.py — commit a52096176f3ddcbe0927be5102b48df4af7b0188 (2026-09-01)",
-    "Raport wdrożeniowy w .agents/reports/ — commit 8c874750d5f22b51426fcaf89fe94db62a6de312 (2026-09-01)"
+    "Utworzenie docs/publication-flow.md — commit 3d66c80e97f225ddac44ece390d7c7aa859399f5 (2026-09-01)",
+    "Aktualizacja agents/kurier365-worker/worker.py — commit d6eb8ea5a75383447c95831493106e0e9422dbdc (2026-09-01)",
+    "Dodanie kolumn S i T (Prompt obraz 1, Prompt obraz 2) do arkusza Kandydaci w Google Sheets (2026-09-01)",
+    "Raport wdrożeniowy w .agents/reports/ — commit 07849b35550da7a47ab490baaf3ba3b9f4e8bd50 (2026-09-01)"
   ],
   "pending": []
 }
