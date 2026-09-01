@@ -1,8 +1,8 @@
 """
 GmailSource v1.0 — Gmail source via PressAI API
 Monitoruje skrzynkę tobroz@gmail.com przez PressAI backend (https://press.impresjapr.pl/api/gmail).
-Priorytetowi nadawcy: WEI, Cezary Rudiński, Arkadiusz Bińczyk, Biały Kruk.
-media-dispatch | media-dev-30 | 01.09.2026
+Priorytetowi nadawcy: WEI, Cezary Rudiński, Arkadiusz Bińczyk, Biały Kruk, Juchniewicz, Bolek, Zabka, Maxmedia, Gryżewski, Kalinowska, Art-Media, Fundacja XBW.
+media-dispatch | media-dev-31 | 01.09.2026
 """
 import hashlib
 import json
@@ -21,14 +21,37 @@ class GmailSource(SourcePlugin):
     """Gmail źródło — monitoruje skrzynkę przez PressAI Gmail API."""
     name = 'gmail'
 
-    # Priorytetowi nadawcy i ich priorytety (P0 = 8-10)
+    # PRIORITY_SENDERS — dopasowanie po fragmencie adresu email LUB nazwy nadawcy (case-insensitive)
+    # Wartości priority: 9-10 = P0 (złoty w Sheets, #editorial-priority Discord)
+    #                    7-8  = P0/P1 (złoty w Sheets)
+    # Dodawaj fragm. domeny (@art-media.pl) lub imienia/nazwiska (rudzinski)
+    # TODO: Uzupełnić o dokładne adresy email współpracowników gdy znane
     PRIORITY_SENDERS = {
+        # === JUŻ ISTNIEJĄCE ===
         'wei.org.pl': {'name': 'WEI', 'priority': 9, 'portal': 'kurier365'},
         'bialykruk.pl': {'name': 'Biały Kruk', 'priority': 8, 'portal': 'kurier365'},
         'rudinski': {'name': 'Cezary Rudiński', 'priority': 9, 'portal': 'kurier365'},
         'rudzinski': {'name': 'Cezary Rudiński', 'priority': 9, 'portal': 'kurier365'},
         'binczyk': {'name': 'Arkadiusz Bińczyk', 'priority': 8, 'portal': 'kurier365'},
         'arkadiusz.binczyk': {'name': 'Arkadiusz Bińczyk', 'priority': 8, 'portal': 'kurier365'},
+
+        # === NOWI WSPÓŁPRACOWNICY (P0) ===
+        # Nowi współpracownicy (01.09.2026)
+        'juchniewicz': {'name': 'Juchniewicz', 'priority': 9, 'portal': 'kurier365'},
+        'bolek': {'name': 'Bolek', 'priority': 9, 'portal': 'kurier365'},
+        'zabka': {'name': 'Zabka Biuro Prasowe', 'priority': 9, 'portal': 'kurier365'},
+        'żabka': {'name': 'Zabka Biuro Prasowe', 'priority': 9, 'portal': 'kurier365'},
+        'maxmedia': {'name': 'Maxmedia', 'priority': 8, 'portal': 'kurier365'},
+        'max-media': {'name': 'Maxmedia', 'priority': 8, 'portal': 'kurier365'},
+        'gryzewski': {'name': 'Gryżewski', 'priority': 9, 'portal': 'kurier365'},
+        'gryżewski': {'name': 'Gryżewski', 'priority': 9, 'portal': 'kurier365'},
+        'kalinowska': {'name': 'Beata Kalinowska', 'priority': 8, 'portal': 'kurier365'},
+        'beata.kalinowska': {'name': 'Beata Kalinowska', 'priority': 8, 'portal': 'kurier365'},
+        'art-media': {'name': 'Art-Media', 'priority': 9, 'portal': 'kurier365'},
+        'artmedia': {'name': 'Art-Media', 'priority': 9, 'portal': 'kurier365'},
+        'art_media': {'name': 'Art-Media', 'priority': 9, 'portal': 'kurier365'},
+        'fundacja': {'name': 'Fundacja XBW', 'priority': 8, 'portal': 'kurier365'},
+        'xbw': {'name': 'Fundacja XBW', 'priority': 9, 'portal': 'kurier365'},
     }
 
     def __init__(
