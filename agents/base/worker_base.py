@@ -304,6 +304,60 @@ class WorkerBase(ABC):
         pass
 
     # ------------------------------------------------------------------
+    # Notifications
+    # ------------------------------------------------------------------
+
+    def notify_discord(self, candidate: ContentCandidate, webhook_url: str = None) -> bool:
+        """Wysyła kandydata do Discord jako Rich Embed."""
+        import os
+        import requests
+        url = webhook_url or os.getenv('DISCORD_WEBHOOK_KURIER365')
+        if not url:
+            self.logger.warning('Brak DISCORD_WEBHOOK_URL — pomijam notyfikację')
+            return False
+
+        geo = candidate.metadata.get('geo_relevance', 'unknown')
+        priority = candidate.priority
+
+        # Kolor embeda na podstawie priorytetu
+        color = 0x1a73e8  # niebieski
+        if priority >= 8:
+            color = 0xdc3545  # czerwony P0
+        elif priority >= 6:
+            color = 0xfd7e14  # pomarańczowy P1
+        elif priority >= 4:
+            color = 0xffc107  # żółty P2
+
+        emoji_geo = {'PL-high': '🇵🇱', 'EU': '🇪🇺', 'global': '🌐', 'low': '⬇️'}.get(geo, '🌐')
+
+        embed = {
+            'title': candidate.title[:250],
+            'url': candidate.content_url,
+            'color': color,
+            'fields': [
+                {'name': '📰 Źródło', 'value': candidate.source, 'inline': True},
+                {'name': '🏷️ Portal', 'value': candidate.portal, 'inline': True},
+                {'name': f'{emoji_geo} Geo', 'value': geo, 'inline': True},
+                {'name': '⚡ Priorytet', 'value': f'P{10-priority if priority<=10 else 0} (score: {priority})', 'inline': True},
+                {'name': '📊 Trend Score', 'value': str(candidate.metadata.get('viral_score', 'N/A')), 'inline': True},
+                {'name': '📝 Lead', 'value': (candidate.summary or 'brak')[:300], 'inline': False},
+            ],
+            'footer': {'text': f'media-dispatch • {candidate.metadata.get("published_at", "")}'},
+        }
+
+        payload = {
+            'content': f'**Nowy kandydat** | {candidate.portal} | `{candidate.id}`',
+            'embeds': [embed]
+        }
+
+        try:
+            r = requests.post(url, json=payload, timeout=10)
+            return r.status_code in (200, 204)
+        except Exception as e:
+            self.logger.error(f'Discord notify error: {e}')
+            return False
+
+    # ------------------------------------------------------------------
     # Health & run
     # ------------------------------------------------------------------
 
