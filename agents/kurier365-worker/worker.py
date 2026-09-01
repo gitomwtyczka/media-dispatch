@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """agents/kurier365-worker/worker.py
 
-Kurier365Worker — instancja WorkerBase dla kurier365.pl
-media-dispatch | media-dev-30 | 01.09.2026
+Kurier365Worker — instancja WorkerBase dla kurier365.pl i biznesciti.com
+media-dispatch | media-dev-34 | 01.09.2026
 
 Architektura rozszerzalna (plugin-based):
   Sources:
@@ -21,6 +21,7 @@ CLI:
   python worker.py --run --top 10         # pokaż top-N kandydatów
   python worker.py --run --sheets         # zapisz do Google Sheets
   python worker.py --run --json           # output jako JSON
+  python worker.py --process CANDIDATE_ID # przetwórz kandydata przez PressAI
 
 Status wdrożenia:
   GmailSource v1.0 — LIVE (PressAI Gmail API, tobroz@gmail.com).
@@ -35,7 +36,11 @@ import json
 import logging
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
+from typing import List, Optional
+
+import requests
 
 # Dodaj root projektu do Python path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -72,23 +77,74 @@ log = logging.getLogger('kurier365-worker')
 
 CONFIG = {
     'portal': 'kurier365.pl',
-    'pressai_url': 'https://press.impresjapr.pl',
+    'pressai_url': os.environ.get('PRESSAI_URL', 'https://press.impresjapr.pl'),
     'feed_crawler_url': os.environ.get('FEED_CRAWLER_URL', 'https://crawler.impresjapr.pl'),
+    'spreadsheet_id': os.environ.get('SPREADSHEET_ID', '1HMuODAIOG8e_9VH-HitdL_TwBRwgFZ0vnSKAW7Wmyig'),
     'state_file': str(Path(__file__).parent / 'kurier365_state.json'),
 
     # Token PressAI — uzupełnij przez docker exec lub secrets manager
-    'pressai_token': os.environ.get('PRESSAI_JWT'),  # lub ustaw wprost
+    'pressai_token': os.environ.get('PRESSAI_JWT') or os.environ.get('PRESSAI_TOKEN'),
 
     # Dane logowania Newseria — uzupełnij gdy konto gotowe
     'newseria_username': os.environ.get('NEWSERIA_USER'),
     'newseria_password': os.environ.get('NEWSERIA_PASS'),
 
     # Content Radar JWT — LIVE na radar.impresjapr.pl
-    # Uzyskaj przez: POST https://radar.impresjapr.pl/api/v1/auth/login
-    # Wymaga planu Pro lub Enterprise w Content Radar.
     'content_radar_jwt': os.environ.get('CONTENT_RADAR_JWT'),
     'content_radar_url': 'https://radar.impresjapr.pl',
 }
+
+# ---------------------------------------------------------------------------
+# ROUTING & PROMPTY
+# ---------------------------------------------------------------------------
+
+def _get_target_portal(candidate: ContentCandidate) -> str:
+    """Wybierz portal docelowy na podstawie sekcji/kategorii kandydata."""
+    section = candidate.metadata.get('section', '')
+    category = candidate.metadata.get('category', '')
+    source = candidate.source.lower()
+
+    # Gmail od współpracowników -> kurier365 (polityka, nauka, reportaż)
+    if source.startswith('gmail:'):
+        return 'Kurier365'
+    # Geostrategia/Obroność -> Kurier365
+    if 'geostrat' in section.lower() or 'defence' in section.lower():
+        return 'Kurier365'
+    # Nauka -> Kurier365
+    if 'nauka' in section.lower() or 'science' in category.lower():
+        return 'Kurier365'
+    # Biznes/gospodarka -> BiznesCiti
+    if any(kw in category.lower() for kw in ['biznes', 'gospodarka', 'finanse', 'ekonomia']):
+        return 'BiznesCiti'
+    return 'Kurier365'
+
+
+def _should_auto_publish(candidate: ContentCandidate) -> bool:
+    """Sprawdź czy kandydat ma własne zdjęcia i powinien od razu trafić do WP draft."""
+    source_lower = candidate.source.lower()
+    return any(kw in source_lower for kw in ['zabka', 'żabka', 'juchniewicz', 'rudzinski', 'rudinski'])
+
+
+def build_generate_payload(candidate: ContentCandidate, target_portal: str) -> dict:
+    """Buduje payload do POST /api/editor/generate w PressAI."""
+    return {
+        'title': candidate.title,
+        'source_text': candidate.raw_content or candidate.summary or candidate.title,
+        'source_url': candidate.content_url,
+        'portal': target_portal,
+        'custom_instructions': (
+            'WYMAGANIA OBOWIĄZKOWE:\n'
+            '1. Artykuł MINIMUM 600 słów (lepiej 800-1000) — absolutnie nie może być krótszy.\n'
+            '2. Tytuł SEO (H1) MUSI zawierać główną frazę kluczową — nie omin tego wymogu.\n'
+            '3. Język polski, przystępny dla szerokiego czytelnika.\n'
+            '4. Optymalizacja pod Google Discover: angażujący wstęp, nagłówki H2/H3, wypunktowania.\n'
+            '5. FAQ na końcu artykułu (min 3 pytania i odpowiedzi).\n'
+            '6. Cross-link z BiznesCiti gdy temat biznesowy.'
+        ),
+        'generate_faq': True,
+        'min_words': 600,  # parametr minimalnej liczby słów PressAI
+    }
+
 
 # ---------------------------------------------------------------------------
 # GOOGLE SHEETS
@@ -96,8 +152,6 @@ CONFIG = {
 
 def write_candidates_to_sheets(candidates: list, spreadsheet_id: str = '1HMuODAIOG8e_9VH-HitdL_TwBRwgFZ0vnSKAW7Wmyig') -> bool:
     """Zapisuje kandydatów do zakładki Kandydaci w Google Sheets."""
-    import os
-    from datetime import datetime
     try:
         from google.oauth2.service_account import Credentials
         import gspread
@@ -122,11 +176,12 @@ def write_candidates_to_sheets(candidates: list, spreadsheet_id: str = '1HMuODAI
         now = datetime.now().strftime('%d.%m.%Y %H:%M')
         rows = []
         for c in candidates:
+            target_portal = _get_target_portal(c)
             rows.append([
                 c.id,
                 now,
                 c.source,
-                c.portal,
+                target_portal,
                 c.metadata.get('category', ''),
                 f'P{max(0, 10-c.priority)}',
                 c.title,
@@ -135,8 +190,10 @@ def write_candidates_to_sheets(candidates: list, spreadsheet_id: str = '1HMuODAI
                 c.metadata.get('author', ''),
                 str(c.metadata.get('geo_relevance_score', '')),
                 'nowy',  # Status
-                '', '', '', '', '',  # puste pola
-                c.metadata.get('geo_relevance', '')
+                '', '', '', '', '',  # puste pola M, N, O, P (WP URL), Q
+                c.metadata.get('geo_relevance', ''),  # R: Notatki
+                c.metadata.get('prompt_image_1', ''), # S: Prompt obraz 1
+                c.metadata.get('prompt_image_2', ''), # T: Prompt obraz 2
             ])
         if rows:
             ws.append_rows(rows, value_input_option='USER_ENTERED')
@@ -147,39 +204,78 @@ def write_candidates_to_sheets(candidates: list, spreadsheet_id: str = '1HMuODAI
         return False
 
 
+def update_candidate_in_sheets(
+    candidate_id: str,
+    status: str = 'w produkcji',
+    wp_url: str = '',
+    spreadsheet_id: str = '1HMuODAIOG8e_9VH-HitdL_TwBRwgFZ0vnSKAW7Wmyig'
+) -> bool:
+    """Aktualizuje Status (kolumna L) i URL draftu WP (kolumna P) w Google Sheets."""
+    try:
+        from google.oauth2.service_account import Credentials
+        import gspread
+    except ImportError:
+        log.warning("Brak bibliotek google-auth / gspread — pomijam aktualizację Sheets")
+        return False
+
+    sa_file = os.getenv('GOOGLE_SA_FILE', '/home/ubuntu/otwock-data/muzeum/muzeum-drive-sa.json')
+    if not os.path.exists(sa_file):
+        log.warning(f"Brak pliku service account ({sa_file}) — pomijam aktualizację Sheets")
+        return False
+
+    try:
+        creds = Credentials.from_service_account_file(
+            sa_file,
+            scopes=['https://www.googleapis.com/auth/spreadsheets']
+        )
+        gc = gspread.authorize(creds)
+        sh = gc.open_by_key(spreadsheet_id)
+        ws = sh.worksheet('Kandydaci')
+
+        cell = ws.find(candidate_id, in_column=1)
+        if not cell:
+            log.warning(f"Kandydat {candidate_id} nie znaleziony w kolumnie A arkusza Kandydaci")
+            return False
+
+        row_idx = cell.row
+        # Kolumna L = 12 (Status), Kolumna P = 16 (URL draftu WP)
+        updates = [
+            {'range': f'L{row_idx}', 'values': [[status]]},
+            {'range': f'P{row_idx}', 'values': [[wp_url or '']]},
+        ]
+        ws.batch_update(updates, value_input_option='USER_ENTERED')
+        log.info(f"Zaktualizowano wiersz {row_idx} w Sheets: Status='{status}', WP_URL='{wp_url}'")
+        return True
+    except Exception as e:
+        log.error(f"Błąd aktualizacji statusu w Sheets dla {candidate_id}: {e}")
+        return False
+
+
 # ---------------------------------------------------------------------------
 # WORKER
 # ---------------------------------------------------------------------------
 
-
 class Kurier365Worker(WorkerBase):
-    """Orkiestrator contentu dla kurier365.pl.
+    """Orkiestrator contentu dla kurier365.pl i biznesciti.com.
 
     Pipeline:
         1. collect_candidates() — zbiera z Gmail + FeedCrawler + Newseria
         2. enrich_with_trends() — ocenia trend_score i geo_relevance
         3. Kandydaci sortowani (priority DESC, trend_score DESC)
-        4. process() — wysyła top kandydatów do Redaktora Naczelnego (Telegram bot)
-
-    Dodawanie nowego źródła:
-        from agents.base.sources.moj_source import MojSource
-        self.add_source(MojSource(portal='kurier365.pl', ...))
-
-    Dodawanie nowego sygnału trendów:
-        from agents.base.trend_signals.moj_signal import MojSignal
-        self.add_trend_signal(MojSignal(api_url=...))
+        4. process(candidate) — generuje artykuł w PressAI, zapisuje do historii,
+           aktualizuje Sheets ('w produkcji') i publikuje WP draft dla wyjątków.
     """
 
     def __init__(self, config: dict = None):
-        """
-        Args:
+        """Args:
             config: nadpisz domyślną konfigurację CONFIG (opcjonalne).
         """
         effective_config = {**CONFIG, **(config or {})}
         super().__init__(effective_config)
 
-        pressai_url = effective_config['pressai_url']
-        pressai_token = effective_config.get('pressai_token')
+        self.pressai_url = effective_config['pressai_url'].rstrip('/')
+        self.pressai_token = effective_config.get('pressai_token')
+        self.spreadsheet_id = effective_config.get('spreadsheet_id', '1HMuODAIOG8e_9VH-HitdL_TwBRwgFZ0vnSKAW7Wmyig')
         feed_crawler_url = effective_config.get('feed_crawler_url', 'https://crawler.impresjapr.pl')
         content_radar_jwt = effective_config.get('content_radar_jwt')
         content_radar_url = effective_config.get('content_radar_url', 'https://radar.impresjapr.pl')
@@ -190,9 +286,9 @@ class Kurier365Worker(WorkerBase):
 
         # Gmail — monitorowanie skrzynki przez PressAI API (tobroz@gmail.com)
         self.add_source(GmailSource(
-            pressai_url=pressai_url,
+            pressai_url=self.pressai_url,
             portal='kurier365',
-            token=pressai_token,
+            token=self.pressai_token,
             hours_back=24,
             state_file='/tmp/gmail_state_kurier365.json'
         ))
@@ -241,38 +337,152 @@ class Kurier365Worker(WorkerBase):
         self.add_trend_signal(GeoRelevanceSignal())
 
         # Content Radar — LIVE integracja z radar.impresjapr.pl
-        # Aktywna gdy CONTENT_RADAR_JWT jest ustawiony w środowisku.
-        # Wymaga planu Pro lub Enterprise w Content Radar.
         self.add_trend_signal(ContentRadarSignal(
             api_url=content_radar_url,
             jwt_token=content_radar_jwt,  # None = tryb placeholder
         ))
 
         # GoogleTrends + Social — fallback placeholder
-        # (Content Radar już agreguje te dane — te pluginy jako backup)
         self.add_trend_signal(GoogleTrendsSignal())
         self.add_trend_signal(SocialTrendsSignal())
 
-    def write_to_sheets(self, candidates: list, spreadsheet_id: str = '1HMuODAIOG8e_9VH-HitdL_TwBRwgFZ0vnSKAW7Wmyig') -> bool:
+    def _get_auth_headers(self) -> dict:
+        token = self.pressai_token or os.environ.get('PRESSAI_JWT') or os.environ.get('PRESSAI_TOKEN')
+        headers = {'Content-Type': 'application/json'}
+        if token:
+            headers['Authorization'] = f'Bearer {token}'
+        return headers
+
+    def write_to_sheets(self, candidates: list, spreadsheet_id: str = None) -> bool:
         """Zapisuje kandydatów do Google Sheets."""
-        return write_candidates_to_sheets(candidates, spreadsheet_id=spreadsheet_id)
+        target_sid = spreadsheet_id or self.spreadsheet_id
+        return write_candidates_to_sheets(candidates, spreadsheet_id=target_sid)
+
+    def generate_article(self, candidate: ContentCandidate, target_portal: str) -> Optional[dict]:
+        """Wywołaj POST /api/editor/generate w PressAI."""
+        url = f"{self.pressai_url}/api/editor/generate"
+        payload = build_generate_payload(candidate, target_portal)
+        headers = self._get_auth_headers()
+
+        log.info(f"Wysyłam zapytanie o generowanie artykułu do {url} dla portalu {target_portal}")
+        try:
+            resp = requests.post(url, json=payload, headers=headers, timeout=180)
+            if resp.status_code in (200, 201):
+                data = resp.json()
+                log.info(f"Pomyślnie wygenerowano artykuł w PressAI dla {candidate.id}")
+                return data
+            log.error(f"Błąd generowania w PressAI HTTP {resp.status_code}: {resp.text[:300]}")
+        except Exception as e:
+            log.error(f"Wyjątek podczas generowania artykułu: {e}")
+        return None
+
+    def save_article_history(self, candidate: ContentCandidate, generated: dict, target_portal: str) -> Optional[dict]:
+        """Zapisz wygenerowany artykuł do historii PressAI (POST /api/articles/)."""
+        url = f"{self.pressai_url}/api/articles/"
+        headers = self._get_auth_headers()
+
+        article_payload = {
+            'title': generated.get('title') or candidate.title,
+            'content': generated.get('content') or generated.get('body') or generated.get('html') or '',
+            'portal': target_portal,
+            'source_url': candidate.content_url or '',
+            'candidate_id': candidate.id,
+            'meta': {
+                'faq': generated.get('faq'),
+                'seo_title': generated.get('seo_title'),
+                'category': candidate.metadata.get('category', ''),
+                'section': candidate.metadata.get('section', ''),
+                'generated_at': datetime.now().isoformat(),
+            }
+        }
+
+        try:
+            resp = requests.post(url, json=article_payload, headers=headers, timeout=30)
+            if resp.status_code in (200, 201):
+                saved = resp.json()
+                log.info(f"Zapisano artykuł do historii PressAI (ID: {saved.get('id', 'brak')})")
+                return saved
+            log.warning(f"Zapis do historii PressAI HTTP {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            log.error(f"Błąd podczas zapisu do historii PressAI: {e}")
+        return None
+
+    def publish_to_wp(self, candidate: ContentCandidate, generated: dict, target_portal: str) -> Optional[dict]:
+        """Wywołaj POST /api/publisher/publish w PressAI (dla wyjątków z własnymi zdjęciami)."""
+        url = f"{self.pressai_url}/api/publisher/publish"
+        headers = self._get_auth_headers()
+
+        publish_payload = {
+            'portal': target_portal,
+            'title': generated.get('title') or candidate.title,
+            'content': generated.get('content') or generated.get('body') or generated.get('html') or '',
+            'status': 'draft',  # Zawsze draft w WP
+            'source_url': candidate.content_url or '',
+            'candidate_id': candidate.id,
+            'tags': generated.get('tags', []),
+            'category': candidate.metadata.get('category', ''),
+        }
+
+        try:
+            resp = requests.post(url, json=publish_payload, headers=headers, timeout=60)
+            if resp.status_code in (200, 201):
+                pub_data = resp.json()
+                log.info(f"Opublikowano draft w WordPress dla {candidate.id}: {pub_data}")
+                return pub_data
+            log.error(f"Błąd publikacji WP draft HTTP {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            log.error(f"Błąd podczas publikacji WP draft: {e}")
+        return None
 
     def process(self, candidate: ContentCandidate) -> dict:
-        """Wyślij kandydata do Redaktora Naczelnego (Telegram bot).
-
-        TODO: Faza 2 — integracja z redaktor-naczelny-bot:
-            POST {telegram_bot_url}/api/candidate
-            Payload: candidate.to_dict() + przyciski inline:
-            [Akceptuj] [Odrzuć] [Odroc D+1] [Odroc D+7] [Uwagi]
-
-        Args:
-            candidate: zatwierdzony kandydat do wysłania
-
-        Returns:
-            Dict z wynikiem: {'status': str, 'candidate_id': str}
+        """Przetwarzanie zatwierdzonego kandydata:
+        1. Określ portal docelowy (_get_target_portal)
+        2. Wywołaj generowanie artykułu w PressAI (POST /api/editor/generate)
+        3. Zapisz do historii PressAI (POST /api/articles/) BEZ publikacji
+        4. WYJĄTEK: jeśli nadawca z własnymi zdjęciami (zabka, juchniewicz, rudzinski) -> publikuj draft WP
+        5. Zaktualizuj Google Sheets: Status -> 'w produkcji', URL draftu WP pusty (lub URL jeśli wyjątek)
         """
-        log.info("process() placeholder: candidate %s '%s'", candidate.id, candidate.title[:50])
-        return {'status': 'placeholder_sent_to_editor', 'candidate_id': candidate.id}
+        target_portal = _get_target_portal(candidate)
+        auto_publish = _should_auto_publish(candidate)
+        log.info(f"Przetwarzanie kandydata {candidate.id} '{candidate.title[:50]}' -> Portal: {target_portal}, Auto-publish: {auto_publish}")
+
+        # 1. Generowanie artykułu
+        generated = self.generate_article(candidate, target_portal)
+        if not generated:
+            log.error(f"Generowanie nie powiodło się dla kandydata {candidate.id}")
+            return {'status': 'error', 'candidate_id': candidate.id, 'error': 'Generation failed'}
+
+        # 2. Zapis do historii PressAI
+        saved_article = self.save_article_history(candidate, generated, target_portal)
+
+        # 3. Publikacja WP (tylko wyjątki)
+        wp_url = ''
+        wp_post_id = None
+        if auto_publish:
+            pub_res = self.publish_to_wp(candidate, generated, target_portal)
+            if pub_res:
+                wp_url = pub_res.get('wp_url') or pub_res.get('post_url') or pub_res.get('url') or ''
+                wp_post_id = pub_res.get('wp_post_id') or pub_res.get('post_id')
+        else:
+            log.info(f"Artykuł {candidate.id} zapisany w historii PressAI — oczekuje na ręczne dodanie zdjęć i publikację.")
+
+        # 4. Aktualizacja Sheets
+        update_candidate_in_sheets(
+            candidate_id=candidate.id,
+            status='w produkcji',
+            wp_url=wp_url,
+            spreadsheet_id=self.spreadsheet_id
+        )
+
+        return {
+            'status': 'w produkcji',
+            'candidate_id': candidate.id,
+            'target_portal': target_portal,
+            'auto_published': auto_publish,
+            'wp_url': wp_url,
+            'wp_post_id': wp_post_id,
+            'pressai_article_id': saved_article.get('id') if saved_article else None
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -281,7 +491,7 @@ class Kurier365Worker(WorkerBase):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='kurier365-worker — Content pipeline dla kurier365.pl',
+        description='kurier365-worker — Content pipeline dla kurier365.pl i biznesciti.com',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Przykłady:
@@ -290,9 +500,11 @@ Przykłady:
   python worker.py --run --top 5
   python worker.py --run --sheets
   python worker.py --run --json
+  python worker.py --process CANDIDATE_ID
 
 Zmienne środowiskowe:
   FEED_CRAWLER_URL            — URL API Feed Crawler (domyślnie: https://crawler.impresjapr.pl)
+  PRESSAI_URL                 — URL API PressAI (domyślnie: https://press.impresjapr.pl)
   PRESSAI_JWT                 — JWT token PressAI
   NEWSERIA_USER               — login Newseria
   NEWSERIA_PASS               — hasło Newseria
@@ -300,6 +512,7 @@ Zmienne środowiskowe:
   DISCORD_WEBHOOK_KURIER365   — Webhook URL Discord dla powiadomień
   DISCORD_WEBHOOK_PRIORITY    — Webhook URL Discord dla powiadomień priorytetowych (P0/Gmail)
   GOOGLE_SA_FILE              — Ścieżka do klucza Service Account Google
+  SPREADSHEET_ID              — ID arkusza Google Sheets
 """
     )
     parser.add_argument('--health', action='store_true', help='Status komponentów workera')
@@ -307,6 +520,7 @@ Zmienne środowiskowe:
     parser.add_argument('--top', type=int, default=10, metavar='N', help='Pokaż top-N kandydatów (domyślnie 10)')
     parser.add_argument('--sheets', action='store_true', help='Zapisz zebranych kandydatów do Google Sheets')
     parser.add_argument('--json', action='store_true', help='Output jako JSON')
+    parser.add_argument('--process', metavar='CANDIDATE_ID', help='Przetwórz pojedynczego kandydata przez PressAI')
     args = parser.parse_args()
 
     worker = Kurier365Worker()
@@ -335,6 +549,25 @@ Zmienne środowiskowe:
             print(f"Google SA File: {'SET (✅ FOUND)' if sa_ok else f'NOT FOUND ({sa_file})'}")
         return
 
+    if args.process:
+        cid = args.process
+        # Stwórz tymczasowego kandydata lub pobierz z pliku stanu
+        state = worker.load_state()
+        cand_dict = state.get('candidates', {}).get(cid)
+        if cand_dict:
+            candidate = ContentCandidate.from_dict(cand_dict)
+        else:
+            candidate = ContentCandidate(
+                id=cid,
+                source='manual',
+                portal='Kurier365',
+                title=f'Kandydat {cid}',
+                summary=''
+            )
+        result = worker.process(candidate)
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return
+
     if args.run:
         candidates = worker.run()
         top = candidates[:args.top]
@@ -348,7 +581,7 @@ Zmienne środowiskowe:
 
         # Zapis do Google Sheets jeśli włączono flagę --sheets
         if args.sheets:
-            write_candidates_to_sheets(candidates)
+            worker.write_to_sheets(candidates)
 
         if args.json:
             print(json.dumps([c.to_dict() for c in top], indent=2, ensure_ascii=False))
