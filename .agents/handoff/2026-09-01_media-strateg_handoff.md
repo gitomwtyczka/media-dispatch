@@ -1,3 +1,30 @@
+## Aktualizacja post-handoff (01.09.2026 19:00)
+
+### Gmail DZIAŁA ✅
+- HTTP 200, 10 maili z ostatnich 7 dni
+- google_credentials były NULL — po ponownej autoryzacji działa
+- Bug w crimson-void NIE WYSTĄPIŁ — wystarczyła reautoryzacja przez UI
+
+### Przetworzono P0 (media-dev-43 — w toku)
+- **Gryżewski** (`m.gryzewski@maxmedia.org.pl`): `is_in_extenso=True` — artykuł partnera BEZ zmian — WP draft kurier365 (link w raporcie 43)
+- **Bińczyk** (Forum Bezpieczeństwa Polski) — poszukiwany w mailach
+
+### Nowi w PRIORITY_SENDERS (commit 8e312a2)
+- Płużański: `pluzanski`, `t_pluzanski`, `tomasz.pluzanski` — P0
+
+### DESIGN: Triage email (do implementacji w nowej sesji)
+Problem: nie każdy mail od P0 nadawcy to materiał do publikacji (np. Płużański — korespondencja wewnętrzna).
+
+Rozwiązanie — dwa tryby w PRIORITY_SENDERS:
+- `always_publish`: Gryżewski/Maxmedia, Żabka biuro prasowe, WEI, Fundacja XBW
+- `triage_needed`: Płużański, Rudiński, Bińczyk, Juchniewicz (nie zawsze mają materiał)
+
+Metoda `_triage_email(subject, snippet) -> PUBLISH | INTERNAL | UNCERTAIN`:
+- LLM call (GPT-4o-mini) na temat + snippet
+- Słowa kluczowe PUBLISH: 'do publikacji', 'komunikat', 'press release', 'artykuł partnera', nazwa portalu
+- Słowa kluczowe INTERNAL: 'do Filipa', 'korekt', 'prośba', 'nadt', puste tematy
+- UNCERTAIN → Sheets status `do oceny` (żółty) zamiast P0
+
 # Handoff — media-strateg | 01.09.2026 18:50
 
 ## Status sesji
