@@ -1,5 +1,5 @@
 """
-GeoRelevanceSignal v1.0
+GeoRelevanceSignal v1.1
 
 Waży atrakcyjność kandydata dla polskiego/europejskiego czytelnika.
 Nie filtruje języka — PressAI tłumaczy. Ocenia relevancję geograficzną i tematyczną.
@@ -57,6 +57,40 @@ class GeoRelevanceSignal(TrendSignal):
         'local restaurant', 'traffic accident',
     ]
 
+    # Nauka polska — priorytet dla kuriera365 dział Nauka
+    PL_SCIENCE = [
+        'polska nauka', 'polscy naukowcy', 'polskie odkrycie', 'polskie badanie',
+        'pan ', 'polska akademia nauk', 'agh ', 'politechnika', 'uw ', 'put ',
+        'ncn ', 'ncbr ', 'narodowe centrum', 'grant naukowy',
+        'naukowcy z polski', 'badacze z polsk', 'polish scientists', 'polish research',
+        'odkrycie', 'przełom naukowy', 'badanie kliniczne', 'wynalazek',
+        # Popularnonaukowe globalne (zawsze interesujące)
+        'space', 'kosmos', 'nasa', 'esa', 'mars', 'exoplanet', 'black hole', 'czarna dziura',
+        'ai badania', 'quantum', 'kwantowy', 'climate science', 'nauki o klimacie',
+        'cancer research', 'alzheimer', 'dna', 'crispr', 'gene therapy',
+    ]
+
+    # Chiny/Indie/Rosja — monitoring geostrategiczny (periodicznie ważne)
+    GEO_PERIODIC = [
+        # Chiny
+        'china', 'chiny', 'chiński', 'chinese', 'beijing', 'pekin', 'xi jinping',
+        'pla ', 'taiwan', 'tajwan', 'south china sea', 'morze południowochińskie',
+        'belt and road', 'nowy jedwabny szlak', 'huawei', 'tiktok ban',
+        # Indie
+        'india', 'indie', 'hindi', 'new delhi', 'modi', 'isro',
+        'india economy', 'gospodarka indii', 'india china',
+        # Rosja
+        'russia', 'rosja', 'rosyjski', 'russian', 'moskwa', 'moscow', 'putin',
+        'kreml', 'kremlin', 'kacapy', 'oligarch', 'gazprom', 'rosneft',
+        'prigozhin', 'wagner', 'siloviki',
+        # Klęski/wydarzenia losowe w tych krajach
+        'trzesienie ziemi', 'earthquake', 'powodź', 'flood', 'tajfun', 'typhoon',
+        'katastrofa', 'disaster', 'wybuch wulkanu', 'volcano',
+        # Relacje z PL/EU
+        'china eu', 'chiny ue', 'china poland', 'indie polska',
+        'russian threat', 'zagrożenie rosyjskie'
+    ]
+
     def _score(self, text: str) -> float:
         text_lower = text.lower()
         score = 1.0  # bazowy
@@ -89,6 +123,20 @@ class GeoRelevanceSignal(TrendSignal):
         elif low_hits == 1:
             score *= 0.6
 
+        # Nauka polska (boost dla działu Nauka kuriera)
+        science_hits = sum(1 for kw in self.PL_SCIENCE if kw in text_lower)
+        if science_hits >= 2:
+            score *= 1.6
+        elif science_hits == 1:
+            score *= 1.3
+
+        # Geostrategia periodyczna (Chiny/Indie/Rosja)
+        geo_hits = sum(1 for kw in self.GEO_PERIODIC if kw in text_lower)
+        if geo_hits >= 3:
+            score *= 1.25  # dużo sygnali = ważny artykuł
+        elif geo_hits >= 1:
+            score *= 1.1  # pojedynczy wzmianka = lekki boost
+
         return min(round(score, 2), 2.0)  # max 2.0
 
     def get_trending_topics(self, category=None, geo='PL') -> List[dict]:
@@ -96,11 +144,14 @@ class GeoRelevanceSignal(TrendSignal):
 
     def enrich_candidate(self, candidate: ContentCandidate, topics: List[dict]) -> ContentCandidate:
         text = f"{candidate.title} {candidate.summary}"
+        text_lower = text.lower()
         multiplier = self._score(text)
+        science_hits = sum(1 for kw in self.PL_SCIENCE if kw in text_lower)
         candidate.priority = round(candidate.priority * multiplier)
         candidate.metadata['geo_relevance_score'] = multiplier
         candidate.metadata['geo_relevance'] = (
-            'PL-high' if multiplier >= 1.5
+            'PL-nauka' if science_hits >= 1 and multiplier >= 1.3
+            else 'PL-high' if multiplier >= 1.5
             else 'EU' if multiplier >= 1.0
             else 'global' if multiplier >= 0.7
             else 'low'
