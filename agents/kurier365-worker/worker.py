@@ -2,12 +2,12 @@
 """agents/kurier365-worker/worker.py
 
 Kurier365Worker — instancja WorkerBase dla kurier365.pl
-media-dispatch | media-dev-26 | 01.09.2026
+media-dispatch | media-dev-28 | 01.09.2026
 
 Architektura rozszerzalna (plugin-based):
   Sources:
     - Gmail (tobroz@gmail.com) — Rudiński, Bińczyk, WEI, Biały Kruk
-    - FeedCrawler (https://crawler.impresjapr.pl — 13k+ RSS feedów) — LIVE
+    - FeedCrawler (https://crawler.impresjapr.pl — 13k+ RSS feedów) — LIVE (ogólne + działy: nauka, geopolityka)
     - Newseria (gospodarka, konsument, prawo)
   Trend Signals:
     - GeoRelevanceSignal (waga PL/EU/Global vs Low relevance) — LIVE
@@ -23,7 +23,7 @@ CLI:
   python worker.py --run --json           # output jako JSON
 
 Status wdrożenia:
-  FeedCrawlerSource v1.1 — LIVE (13k+ feedów, crawler.impresjapr.pl).
+  FeedCrawlerSource v1.2 — LIVE (13k+ feedów, crawler.impresjapr.pl, działy tematyczne).
   GeoRelevanceSignal v1.0 — LIVE (priorytetyzacja PL/EU/US-biznes).
   Content Radar LIVE — aktywny gdy CONTENT_RADAR_JWT ustawiony.
   Discord notifications — aktywne gdy DISCORD_WEBHOOK_KURIER365 ustawiony.
@@ -211,6 +211,24 @@ class Kurier365Worker(WorkerBase):
             hours_back=6,
             limit=50,
             state_file='/tmp/feed_crawler_state_kurier365.json'
+        ))
+
+        # Dział NAUKA (Tier 1 Scientific + popularnonaukowe PL)
+        self.add_source(FeedCrawlerSource(
+            api_url=feed_crawler_url,
+            portal='kurier365',
+            departments=['science-high-tech', 'health-biotech'],
+            limit=20,
+            state_file='/tmp/fc_kurier365_science.json'
+        ))
+
+        # Geostrategia periodyczna (Chiny/Indie/Rosja + obrona)
+        self.add_source(FeedCrawlerSource(
+            api_url=feed_crawler_url,
+            portal='kurier365',
+            departments=['defence-geopolitics'],
+            limit=10,
+            state_file='/tmp/fc_kurier365_geo.json'
         ))
 
         # Newseria — agencja B2B z Eco-Bias Gate
