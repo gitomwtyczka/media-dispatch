@@ -2,12 +2,12 @@
 """agents/kurier365-worker/worker.py
 
 Kurier365Worker — instancja WorkerBase dla kurier365.pl
-media-dispatch | media-dev-architect | 31.08.2026
+media-dispatch | media-dev-24 | 01.09.2026
 
 Architektura rozszerzalna (plugin-based):
   Sources:
     - Gmail (tobroz@gmail.com) — Rudiński, Bińczyk, WEI, Biały Kruk
-    - RSS (UOKiK, Nauka w Polsce, PAP, ISBNews)
+    - RSS (UOKiK, Nauka PAP, PAP, Infor Prawo, Money.pl) — LIVE
     - Newseria (gospodarka, konsument, prawo)
   Trend Signals:
     - ContentRadarSignal (radar.impresjapr.pl — LIVE)
@@ -21,7 +21,7 @@ CLI:
   python worker.py --run --json           # output jako JSON
 
 Status wdrożenia:
-  v0.1 skeleton — wszystkie źródła w placeholder mode (fetch zwraca []).
+  RSSSource v1.0 — LIVE (feedparser, dedup w /tmp/rss_state_kurier365.json).
   Content Radar LIVE — aktywny gdy CONTENT_RADAR_JWT ustawiony.
   Aktywacja źródeł: dodaj token PressAI i dane logowania w CONFIG.
 """
@@ -36,7 +36,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from agents.base.worker_base import WorkerBase, ContentCandidate
-from agents.base.sources.gmail_source import GmailSource, RSSSource
+from agents.base.sources.gmail_source import GmailSource
+from agents.base.sources.rss_source import RSSSource
 from agents.base.sources.newseria_source import NewseriaSource
 from agents.base.trend_signals.content_radar_signal import ContentRadarSignal
 from agents.base.trend_signals.google_trends_signal import GoogleTrendsSignal, SocialTrendsSignal
@@ -140,19 +141,15 @@ class Kurier365Worker(WorkerBase):
 
         # RSS — instytucjonalne źródła (urzędy, nauka, depesze)
         self.add_source(RSSSource(
-            portal='kurier365.pl',
-            pressai_url=pressai_url,
-            token=pressai_token,
             feeds=[
-                # Priorytet 9 — komunikaty UOKiK (prawo konsumenta)
-                {'url': 'https://uokik.gov.pl/rss.xml', 'category': 'prawo-konsumenta', 'priority': 9},
-                # Priorytet 8 — PAP (ogólnopolskie)
-                {'url': 'https://www.pap.pl/rss.xml', 'category': 'kraj', 'priority': 8},
-                # Priorytet 7 — nauka
-                {'url': 'https://naukawpolsce.pl/rss', 'category': 'nauka', 'priority': 7},
-                # Priorytet 7 — ISBNews (biznes/finanse)
-                {'url': 'https://isbnews.pl/rss', 'category': 'finanse', 'priority': 7},
-            ]
+                {'url': 'https://uokik.gov.pl/rss.xml', 'name': 'UOKiK', 'category': 'Prawo konsumenta', 'priority': 9},
+                {'url': 'https://naukawpolsce.pl/rss', 'name': 'Nauka PAP', 'category': 'Nauka', 'priority': 7},
+                {'url': 'https://www.pap.pl/rss.xml', 'name': 'PAP', 'category': 'Kraj', 'priority': 7},
+                {'url': 'https://www.infor.pl/rss/prawo', 'name': 'Infor Prawo', 'category': 'Prawo/Podatki', 'priority': 6},
+                {'url': 'https://www.money.pl/rss/wiadomosci.xml', 'name': 'Money.pl', 'category': 'Biznes lekki', 'priority': 5},
+            ],
+            portal='kurier365',
+            state_file='/tmp/rss_state_kurier365.json'
         ))
 
         # Newseria — agencja B2B z Eco-Bias Gate
