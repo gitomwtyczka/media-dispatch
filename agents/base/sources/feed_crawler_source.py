@@ -1,7 +1,7 @@
 """
-FeedCrawlerSource v1.1 — Feed Crawler API Source Plugin
+FeedCrawlerSource v1.2 — Feed Crawler API Source Plugin
 Integracja z feed-crawler (13k+ RSS feedów, 5.9M+ artykułów)
-media-dispatch | media-dev-24 | 01.09.2026
+media-dispatch | media-dev-28 | 01.09.2026
 """
 import hashlib
 import json
@@ -26,6 +26,7 @@ class FeedCrawlerSource(SourcePlugin):
         portal: str = 'kurier365',
         categories: Optional[List[str]] = None,
         departments: Optional[List[str]] = None,
+        tier_max: Optional[int] = None,
         hours_back: int = 24,
         limit: int = 50,
         state_file: Optional[str] = None,
@@ -35,7 +36,8 @@ class FeedCrawlerSource(SourcePlugin):
             api_url: Base URL do API feed-crawler (np. https://crawler.impresjapr.pl lub http://localhost:8002)
             portal: Nazwa docelowego portalu (np. kurier365, prawy)
             categories: Opcjonalne słowa kluczowe do filtrowania tematycznego
-            departments: Opcjonalne działy w feed-crawler (np. ['konkurencja-biznes', 'nauka'])
+            departments: Opcjonalne działy w feed-crawler (np. ['science-high-tech', 'health-biotech'])
+            tier_max: Opcjonalny maksymalny tier (np. 1, 2, 3)
             hours_back: Ile godzin wstecz uwzględniać
             limit: Maksymalna liczba artykułów do pobrania
             state_file: Ścieżka do pliku JSON ze stanem (deduplikacja)
@@ -44,6 +46,7 @@ class FeedCrawlerSource(SourcePlugin):
         self.portal = portal
         self.categories = [c.lower() for c in (categories or [])]
         self.departments = departments or []
+        self.tier_max = tier_max
         self.hours_back = hours_back
         self.limit = limit
         self.state_file = state_file or f'/tmp/feed_crawler_state_{portal}.json'
@@ -86,7 +89,7 @@ class FeedCrawlerSource(SourcePlugin):
             return 9
         if any(k in full_text for k in ['pap', 'rpp', 'inflacja', 'stopy procentowe', 'podatk', 'ustawa', 'sejm']):
             return 8
-        if any(k in full_text for k in ['nauka', 'badania', 'odkrycie', 'technolog', 'ai', 'sztuczna inteligencja']):
+        if any(k in full_text for k in ['nauka', 'badania', 'odkrycie', 'technolog', 'ai', 'sztuczna inteligencja', 'space', 'kosmos', 'biotech', 'zdrowie']):
             return 7
         if any(k in full_text for k in ['gospodark', 'biznes', 'firma', 'rynek', 'giełda', 'inwestycj']):
             return 6
@@ -119,26 +122,17 @@ class FeedCrawlerSource(SourcePlugin):
 
         return None
 
-    def fetch(self) -> List[ContentCandidate]:
-        candidates: List[ContentCandidate] = []
+    def _fetch_single(self, url: str) -> List[ContentCandidate]:
+        """Pobiera i przetwarza artykuły z pojedynczego endpointu URL."""
+        data = self._http_get_json(url)
         raw_articles: List[dict] = []
-
-        # 1. Pobieranie artykułów
-        if self.departments:
-            for dep in self.departments:
-                url = f"{self.api_url}/api/export?format=json&department={urllib.parse.quote(dep)}&limit={self.limit}"
-                data = self._http_get_json(url)
-                if data and 'articles' in data:
-                    raw_articles.extend(data['articles'])
-        else:
-            url = f"{self.api_url}/api/articles?page=1&per_page={self.limit}"
-            data = self._http_get_json(url)
-            if data and 'articles' in data:
-                raw_articles.extend(data['articles'])
+        if data:
+            if isinstance(data, dict) and 'articles' in data:
+                raw_articles = data['articles']
             elif isinstance(data, list):
-                raw_articles.extend(data)
+                raw_articles = data
 
-        # 2. Przetwórz i zmapuj na ContentCandidate
+        candidates: List[ContentCandidate] = []
         for art in raw_articles:
             eid = self._entry_id(art)
             if eid in self._seen:
@@ -148,7 +142,7 @@ class FeedCrawlerSource(SourcePlugin):
             summary = art.get('summary') or ''
             content = art.get('content') or ''
             feed_name = art.get('feed_name') or 'unknown'
-            url = art.get('url') or ''
+            url_link = art.get('url') or ''
             pub_date = art.get('published_at') or art.get('fetched_at')
 
             # Filtrowanie kategorii jeśli zdefiniowano
@@ -167,7 +161,7 @@ class FeedCrawlerSource(SourcePlugin):
                 portal=self.portal,
                 title=title,
                 summary=summary[:500] if summary else (content[:500] if content else ''),
-                content_url=url,
+                content_url=url_link,
                 raw_content=content or summary,
                 metadata={
                     'feed_name': feed_name,
@@ -180,9 +174,33 @@ class FeedCrawlerSource(SourcePlugin):
             )
             candidates.append(candidate)
 
-        self._save_seen()
-        self.logger.info(f"FeedCrawlerSource pobrał {len(candidates)} nowych kandydatów.")
         return candidates
+
+    def _dedup(self, candidates: List[ContentCandidate]) -> List[ContentCandidate]:
+        seen_ids = set()
+        unique = []
+        for c in candidates:
+            if c.id not in seen_ids:
+                seen_ids.add(c.id)
+                unique.append(c)
+        return unique
+
+    def fetch(self) -> List[ContentCandidate]:
+        candidates: List[ContentCandidate] = []
+        if self.departments:
+            for dept in self.departments:
+                url = f"{self.api_url}/api/export?department={urllib.parse.quote(dept)}&format=json&limit={self.limit}"
+                if self.tier_max:
+                    url += f"&tier_max={self.tier_max}"
+                candidates.extend(self._fetch_single(url))
+        else:
+            url = f"{self.api_url}/api/articles?hours={self.hours_back}&limit={self.limit}&page=1&per_page={self.limit}"
+            candidates.extend(self._fetch_single(url))
+
+        deduped = self._dedup(candidates)
+        self._save_seen()
+        self.logger.info(f"FeedCrawlerSource pobrał {len(deduped)} nowych kandydatów.")
+        return deduped
 
     def health_check(self) -> bool:
         """Sprawdź czy feed-crawler API odpowiada."""
