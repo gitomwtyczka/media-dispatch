@@ -3,7 +3,7 @@
 Reguły specyficzne dla workspace `media-dispatch`.
 Uzupełnia `RULE[user_global]` — nie zastępuje.
 
-> Ostatnia aktualizacja: 2026-08-31 | media-dev-06
+> Ostatnia aktualizacja: 2026-09-01 | media-dev-22
 
 ---
 
@@ -13,7 +13,7 @@ Uzupełnia `RULE[user_global]` — nie zastępuje.
 System agentów AI który zbiera tematy, produkuje treści i dystrybuuje je
 na wiele platform bez ręcznej pracy redakcyjnej.
 
-**Platformy docelowe:** WordPress portale, YouTube, TikTok, Telegram.  
+**Platformy docelowe:** WordPress portale, YouTube, TikTok, Telegram (dystrybucja), Discord (centrum redakcyjne).  
 **Systemy produkcji:** VSE (Video SEO Engine), PressAI, Shorts Machine.
 
 ---
@@ -44,7 +44,8 @@ na wiele platform bez ręcznej pracy redakcyjnej.
 - `content-radar-worker` — Google Trends + social
 
 ### Warstwa 2 — Editorial
-- `redaktor-naczelny` — meta-agent syntetyzujący wywiad
+- `redaktor-naczelny` — Discord Editorial Center (Discord Interactions API + Webhooks na serwerze Impresja; kanały #editorial-prawy, #editorial-kurier365, #editorial-biznesciti; obsługa przycisków akcji i modali uwag)
+  > *Uwaga: Infrastruktura Discord istnieje już w crimson-void jako webhook notifier (`backend/discord_notifier.py`), rozszerzamy o FastAPI Interactions endpoint.*
 
 ### Warstwa 3 — Production
 - `vse-worker` — video → transkrypcja Whisper → SEO + shorty + draft WP
@@ -214,4 +215,5 @@ Worker MOŻE odkładać tymczasową wiedzę w scratch swojego workspace
 *Inicjacja: media-dev-01 | 28.08.2026*  
 *Rozbudowa: Supervisor 01 | sonic-void | 29.08.2026 — VSE infra, kanały, pre-flight*  
 *Rozbudowa: media-strateg | 30.08.2026 — Dispatch Protocol, self-contained scripts, hierarchia wiedzy*  
-*Rozbudowa: media-dev-06 | 31.08.2026 — reguła publikowania bezwzględna, Short Machine*
+*Rozbudowa: media-dev-06 | 31.08.2026 — reguła publikowania bezwzględna, Short Machine*  
+*Rozbudowa: media-dev-22 | 01.09.2026 — Discord Editorial Center w architekturze*
