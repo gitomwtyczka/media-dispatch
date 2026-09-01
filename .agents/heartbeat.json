@@ -1,14 +1,13 @@
 {
-  "callsign": "media-dev-17",
+  "callsign": "media-dev-22",
   "status": "done",
-  "current_task": "Aktualizacja Google Sheets harmonogramu editorial (nowe kolumny + wiersze Lp 10-14)",
-  "timestamp": "2026-09-01T00:44:10+02:00",
+  "current_task": "Aktualizacja dokumentacji — Telegram -> Discord Editorial Center dla Redaktora Naczelnego",
+  "timestamp": "2026-09-01T10:29:00+02:00",
   "last_completed": [
-    "Weryfikacja credentials Google na Oracle VPS (Sheets API wyłączone w projekcie SA)",
-    "Implementacja modułu synchronizacji agents/sheets-sync-worker/update_editorial.py z obsługą gspread, SA, OAuth i dry-run",
-    "Wygenerowanie gotowego pliku CSV agents/sheets-sync-worker/editorial_schedule_Lp10-14.csv",
-    "Przygotowanie dokumentacji agents/sheets-sync-worker/README.md",
-    "Raport wdrożeniowy dual-write (media-dispatch + sonic-void inbox) — commit 2e4a0aa / 78297bd (2026-09-01)"
+    "Aktualizacja docs/editorial-sources-spec.md (Discord Editorial Center, Action Row, Modale, Flow techniczny) — commit e2e0d5942ef9c43034cd2fe68a6c9501baf9d6f4 (2026-09-01)",
+    "Aktualizacja AGENTS.md (architektura Warstwy 2 Editorial Discord + webhook/interactions) — commit 92dbbfbf36872ea4e648021b553b7d3756535a73 (2026-09-01)",
+    "Aktualizacja ROADMAP.md (Faza 2: redaktor-naczelny-discord) — commit 9d375d174ce23d9a6ca16592d29280c46224dcc0 (2026-09-01)",
+    "Utworzenie docs/discord-editorial-center.md (kompletna specyfikacja Discord Editorial Center) — commit a4e21217d79996a9181e76e3488157d111f389d1 (2026-09-01)"
   ],
   "pending": []
 }
