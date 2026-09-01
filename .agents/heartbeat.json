@@ -1,13 +1,13 @@
 {
-  "callsign": "media-dev-24",
+  "callsign": "media-dev-26",
   "status": "done",
-  "current_task": "Implementacja RSSSource / FeedCrawlerSource, integracja z kurier365-worker, wdrożenie cronjob na VPS",
-  "timestamp": "2026-09-01T11:10:30+02:00",
+  "current_task": "Implementacja GeoRelevanceSignal, powiadomienia Discord i zapis Google Sheets dla kurier365-worker",
+  "timestamp": "2026-09-01T11:18:00+02:00",
   "last_completed": [
-    "Implementacja RSSSource v1.0 (agents/base/sources/rss_source.py) — commit c551b05034576eb9f63c0f388031362c66bbe213 (2026-09-01)",
-    "Implementacja FeedCrawlerSource v1.1 (agents/base/sources/feed_crawler_source.py) — commit ce11ebbb8d06e28fd67727d4d107d2d373ee8fd8 (2026-09-01)",
-    "Aktualizacja agents/kurier365-worker/worker.py (FeedCrawlerSource LIVE) — commit c5d96df470b1febd788ed1cc125b5419e4349100 (2026-09-01)",
-    "Instalacja repo /home/ubuntu/media-dispatch oraz cronjob co 6h na VPS oracle-crimson (2026-09-01)"
+    "Implementacja GeoRelevanceSignal v1.0 (agents/base/trend_signals/geo_relevance_signal.py) — commit 8834815e7e38536e8b48c051e557f260fc46c829 (2026-09-01)",
+    "Implementacja notify_discord() w WorkerBase (agents/base/worker_base.py) — commit e858bebc14139a6e6aa946b29b798645e3009952 (2026-09-01)",
+    "Aktualizacja agents/kurier365-worker/worker.py (GeoRelevanceSignal + Sheets + Discord) — commit 00e802cf45995ef10b299568f19ebe147ba01d6b (2026-09-01)",
+    "Synchronizacja kodu na VPS oracle-crimson (2026-09-01)"
   ],
   "pending": []
 }
