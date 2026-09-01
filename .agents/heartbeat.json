@@ -1,13 +1,13 @@
 {
-  "callsign": "media-dev-26",
+  "callsign": "media-dev-29",
   "status": "done",
-  "current_task": "Implementacja GeoRelevanceSignal, powiadomienia Discord i zapis Google Sheets dla kurier365-worker",
-  "timestamp": "2026-09-01T11:18:00+02:00",
+  "current_task": "Dual-channel Discord + kolory priorytetowe w Sheets",
+  "timestamp": "2026-09-01T11:32:00+02:00",
   "last_completed": [
-    "Implementacja GeoRelevanceSignal v1.0 (agents/base/trend_signals/geo_relevance_signal.py) — commit 8834815e7e38536e8b48c051e557f260fc46c829 (2026-09-01)",
-    "Implementacja notify_discord() w WorkerBase (agents/base/worker_base.py) — commit e858bebc14139a6e6aa946b29b798645e3009952 (2026-09-01)",
-    "Aktualizacja agents/kurier365-worker/worker.py (GeoRelevanceSignal + Sheets + Discord) — commit 00e802cf45995ef10b299568f19ebe147ba01d6b (2026-09-01)",
-    "Synchronizacja kodu na VPS oracle-crimson (2026-09-01)"
+    "notify_discord() dual-channel w agents/base/worker_base.py — commit ae1546f6e1d439c4550ec74ace9730a3a0f16c17 (2026-09-01)",
+    "Dokumentacja kanałów Discord w AGENTS.md — commit 505a054ef0c550a697e7fcd655cea704da38735f (2026-09-01)",
+    "Skrypt conditional formatting sheets agents/sheets-sync-worker/apply_kandydaci_formatting.py — commit 85359537104f7d746a270826b3c55d80729a6306 (2026-09-01)",
+    "Aktualizacja agents/kurier365-worker/worker.py — commit c4544b77736b332063362be1751599b7773f13ec (2026-09-01)"
   ],
   "pending": []
 }
