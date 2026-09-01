@@ -1,13 +1,19 @@
 {
-  "callsign": "media-dev-22",
-  "status": "done",
-  "current_task": "Aktualizacja dokumentacji — Telegram -> Discord Editorial Center dla Redaktora Naczelnego",
-  "timestamp": "2026-09-01T10:29:00+02:00",
+  "callsign": "media-dev-24",
+  "status": "working",
+  "current_task": "Implementacja RSSSource.fetch(), aktualizacja kurier365-worker, test i cronjob na VPS",
+  "timestamp": "2026-09-01T10:54:50+02:00",
   "last_completed": [
     "Aktualizacja docs/editorial-sources-spec.md (Discord Editorial Center, Action Row, Modale, Flow techniczny) — commit e2e0d5942ef9c43034cd2fe68a6c9501baf9d6f4 (2026-09-01)",
     "Aktualizacja AGENTS.md (architektura Warstwy 2 Editorial Discord + webhook/interactions) — commit 92dbbfbf36872ea4e648021b553b7d3756535a73 (2026-09-01)",
     "Aktualizacja ROADMAP.md (Faza 2: redaktor-naczelny-discord) — commit 9d375d174ce23d9a6ca16592d29280c46224dcc0 (2026-09-01)",
     "Utworzenie docs/discord-editorial-center.md (kompletna specyfikacja Discord Editorial Center) — commit a4e21217d79996a9181e76e3488157d111f389d1 (2026-09-01)"
   ],
-  "pending": []
+  "pending": [
+    "Krok 1: RSSSource.fetch() w agents/base/sources/rss_source.py",
+    "Krok 2: pip3 install feedparser na VPS",
+    "Krok 3: Aktualizacja agents/kurier365-worker/worker.py",
+    "Krok 4: Skrypt testowy /tmp/test_rss.py na VPS",
+    "Krok 5: Konfiguracja cronjob na VPS"
+  ]
 }
