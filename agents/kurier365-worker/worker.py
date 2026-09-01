@@ -2,7 +2,7 @@
 """agents/kurier365-worker/worker.py
 
 Kurier365Worker — instancja WorkerBase dla kurier365.pl
-media-dispatch | media-dev-24 | 01.09.2026
+media-dispatch | media-dev-26 | 01.09.2026
 
 Architektura rozszerzalna (plugin-based):
   Sources:
@@ -10,6 +10,7 @@ Architektura rozszerzalna (plugin-based):
     - FeedCrawler (https://crawler.impresjapr.pl — 13k+ RSS feedów) — LIVE
     - Newseria (gospodarka, konsument, prawo)
   Trend Signals:
+    - GeoRelevanceSignal (waga PL/EU/Global vs Low relevance) — LIVE
     - ContentRadarSignal (radar.impresjapr.pl — LIVE)
     - GoogleTrendsSignal (fallback placeholder)
     - SocialTrendsSignal (fallback placeholder)
@@ -18,12 +19,15 @@ CLI:
   python worker.py --health               # status wszystkich komponentów
   python worker.py --run                  # zbierz kandydatów
   python worker.py --run --top 10         # pokaż top-N kandydatów
+  python worker.py --run --sheets         # zapisz do Google Sheets
   python worker.py --run --json           # output jako JSON
 
 Status wdrożenia:
   FeedCrawlerSource v1.1 — LIVE (13k+ feedów, crawler.impresjapr.pl).
+  GeoRelevanceSignal v1.0 — LIVE (priorytetyzacja PL/EU/US-biznes).
   Content Radar LIVE — aktywny gdy CONTENT_RADAR_JWT ustawiony.
-  Aktywacja źródeł: dodaj token PressAI i dane logowania w CONFIG.
+  Discord notifications — aktywne gdy DISCORD_WEBHOOK_KURIER365 ustawiony.
+  Google Sheets — aktywny gdy GOOGLE_SA_FILE ustawiony.
 """
 import argparse
 import json
@@ -39,6 +43,7 @@ from agents.base.worker_base import WorkerBase, ContentCandidate
 from agents.base.sources.gmail_source import GmailSource
 from agents.base.sources.feed_crawler_source import FeedCrawlerSource
 from agents.base.sources.newseria_source import NewseriaSource
+from agents.base.trend_signals.geo_relevance_signal import GeoRelevanceSignal
 from agents.base.trend_signals.content_radar_signal import ContentRadarSignal
 from agents.base.trend_signals.google_trends_signal import GoogleTrendsSignal, SocialTrendsSignal
 
@@ -85,6 +90,63 @@ CONFIG = {
 }
 
 # ---------------------------------------------------------------------------
+# GOOGLE SHEETS
+# ---------------------------------------------------------------------------
+
+def write_candidates_to_sheets(candidates: list, spreadsheet_id: str = '1HMuODAIOG8e_9VH-HitdL_TwBRwgFZ0vnSKAW7Wmyig') -> bool:
+    """Zapisuje kandydatów do zakładki Kandydaci w Google Sheets."""
+    import os
+    from datetime import datetime
+    try:
+        from google.oauth2.service_account import Credentials
+        import gspread
+    except ImportError:
+        log.warning("Brak bibliotek google-auth / gspread — pomijam zapis do Sheets")
+        return False
+
+    sa_file = os.getenv('GOOGLE_SA_FILE', '/home/ubuntu/otwock-data/muzeum/muzeum-drive-sa.json')
+    if not os.path.exists(sa_file):
+        log.warning(f"Brak pliku service account ({sa_file}) — pomijam zapis do Sheets")
+        return False
+
+    try:
+        creds = Credentials.from_service_account_file(
+            sa_file,
+            scopes=['https://www.googleapis.com/auth/spreadsheets']
+        )
+        gc = gspread.authorize(creds)
+        sh = gc.open_by_key(spreadsheet_id)
+        ws = sh.worksheet('Kandydaci')
+
+        now = datetime.now().strftime('%d.%m.%Y %H:%M')
+        rows = []
+        for c in candidates:
+            rows.append([
+                c.id,
+                now,
+                c.source,
+                c.portal,
+                c.metadata.get('category', ''),
+                f'P{max(0, 10-c.priority)}',
+                c.title,
+                (c.summary or '')[:200],
+                c.content_url,
+                c.metadata.get('author', ''),
+                str(c.metadata.get('geo_relevance_score', '')),
+                'nowy',  # Status
+                '', '', '', '', '',  # puste pola
+                c.metadata.get('geo_relevance', '')
+            ])
+        if rows:
+            ws.append_rows(rows, value_input_option='USER_ENTERED')
+            log.info(f'Zapisano {len(rows)} kandydatów do Sheets')
+        return True
+    except Exception as e:
+        log.error(f'Błąd zapisu do Sheets: {e}')
+        return False
+
+
+# ---------------------------------------------------------------------------
 # WORKER
 # ---------------------------------------------------------------------------
 
@@ -94,7 +156,7 @@ class Kurier365Worker(WorkerBase):
 
     Pipeline:
         1. collect_candidates() — zbiera z Gmail + FeedCrawler + Newseria
-        2. enrich_with_trends() — ocenia trend_score przez Content Radar LIVE
+        2. enrich_with_trends() — ocenia trend_score i geo_relevance
         3. Kandydaci sortowani (priority DESC, trend_score DESC)
         4. process() — wysyła top kandydatów do Redaktora Naczelnego (Telegram bot)
 
@@ -112,8 +174,7 @@ class Kurier365Worker(WorkerBase):
         Args:
             config: nadpisz domyślną konfigurację CONFIG (opcjonalne).
         """
-        effective_config = {**CONFIG, **(config or {})}
-        super().__init__(effective_config)
+        effective_config = {**CONFIG, **(config or {})}\n        super().__init__(effective_config)
 
         pressai_url = effective_config['pressai_url']
         pressai_token = effective_config.get('pressai_token')
@@ -163,6 +224,9 @@ class Kurier365Worker(WorkerBase):
         # Sygnały trendów
         # ------------------------------------------------------------------
 
+        # GeoRelevanceSignal — waży relevancję PL/EU/US-biznes vs low relevance
+        self.add_trend_signal(GeoRelevanceSignal())
+
         # Content Radar — LIVE integracja z radar.impresjapr.pl
         # Aktywna gdy CONTENT_RADAR_JWT jest ustawiony w środowisku.
         # Wymaga planu Pro lub Enterprise w Content Radar.
@@ -175,6 +239,10 @@ class Kurier365Worker(WorkerBase):
         # (Content Radar już agreguje te dane — te pluginy jako backup)
         self.add_trend_signal(GoogleTrendsSignal())
         self.add_trend_signal(SocialTrendsSignal())
+
+    def write_to_sheets(self, candidates: list, spreadsheet_id: str = '1HMuODAIOG8e_9VH-HitdL_TwBRwgFZ0vnSKAW7Wmyig') -> bool:
+        """Zapisuje kandydatów do Google Sheets."""
+        return write_candidates_to_sheets(candidates, spreadsheet_id=spreadsheet_id)
 
     def process(self, candidate: ContentCandidate) -> dict:
         """Wyślij kandydata do Redaktora Naczelnego (Telegram bot).
@@ -207,19 +275,23 @@ Przykłady:
   python worker.py --health
   python worker.py --run
   python worker.py --run --top 5
+  python worker.py --run --sheets
   python worker.py --run --json
 
 Zmienne środowiskowe:
-  FEED_CRAWLER_URL     — URL API Feed Crawler (domyślnie: https://crawler.impresjapr.pl)
-  PRESSAI_JWT          — JWT token PressAI
-  NEWSERIA_USER        — login Newseria
-  NEWSERIA_PASS        — hasło Newseria
-  CONTENT_RADAR_JWT    — JWT token Content Radar (radar.impresjapr.pl)
+  FEED_CRAWLER_URL            — URL API Feed Crawler (domyślnie: https://crawler.impresjapr.pl)
+  PRESSAI_JWT                 — JWT token PressAI
+  NEWSERIA_USER               — login Newseria
+  NEWSERIA_PASS               — hasło Newseria
+  CONTENT_RADAR_JWT           — JWT token Content Radar (radar.impresjapr.pl)
+  DISCORD_WEBHOOK_KURIER365   — Webhook URL Discord dla powiadomień
+  GOOGLE_SA_FILE              — Ścieżka do klucza Service Account Google
 """
     )
     parser.add_argument('--health', action='store_true', help='Status komponentów workera')
     parser.add_argument('--run', action='store_true', help='Zbierz kandydatów ze źródeł')
     parser.add_argument('--top', type=int, default=10, metavar='N', help='Pokaż top-N kandydatów (domyślnie 10)')
+    parser.add_argument('--sheets', action='store_true', help='Zapisz zebranych kandydatów do Google Sheets')
     parser.add_argument('--json', action='store_true', help='Output jako JSON')
     args = parser.parse_args()
 
@@ -240,11 +312,27 @@ Zmienne środowiskowe:
             print(f"Trend signals: {', '.join(signals) if signals else 'none'}")
             cr_jwt = os.environ.get('CONTENT_RADAR_JWT')
             print(f"Content Radar JWT: {'SET (✅ LIVE)' if cr_jwt else 'NOT SET (⚠️ trends disabled)'}")
+            discord_url = os.environ.get('DISCORD_WEBHOOK_KURIER365')
+            print(f"Discord Webhook: {'SET (✅ LIVE)' if discord_url else 'NOT SET (⚠️ discord disabled)'}")
+            sa_file = os.environ.get('GOOGLE_SA_FILE', '/home/ubuntu/otwock-data/muzeum/muzeum-drive-sa.json')
+            sa_ok = os.path.exists(sa_file)
+            print(f"Google SA File: {'SET (✅ FOUND)' if sa_ok else f'NOT FOUND ({sa_file})'}")
         return
 
     if args.run:
         candidates = worker.run()
         top = candidates[:args.top]
+
+        # Discord notify dla top kandydatów (priority >= 6)
+        discord_sent = 0
+        for c in top:
+            if c.priority >= 6:
+                if worker.notify_discord(c):
+                    discord_sent += 1
+
+        # Zapis do Google Sheets jeśli włączono flagę --sheets
+        if args.sheets:
+            write_candidates_to_sheets(candidates)
 
         if args.json:
             print(json.dumps([c.to_dict() for c in top], indent=2, ensure_ascii=False))
@@ -252,9 +340,12 @@ Zmienne środowiskowe:
             print(f"\nZnaleziono {len(candidates)} kandydatów. Top-{len(top)}:\n")
             for c in top:
                 trend = f" trend={c.trend_score:.2f}" if c.trend_score > 0 else ""
-                print(f"  [{c.priority:2d}] [{c.source:20s}]{trend} {c.title[:70]}")
+                geo = f" [{c.metadata.get('geo_relevance', '')}]" if 'geo_relevance' in c.metadata else ""
+                print(f"  [{c.priority:2d}] [{c.source:20s}]{trend}{geo} {c.title[:70]}")
             if len(candidates) > args.top:
                 print(f"  ... i {len(candidates) - args.top} więcej")
+            if discord_sent > 0:
+                print(f"\nWysłano {discord_sent} powiadomień do Discord.")
         return
 
     parser.print_help()
