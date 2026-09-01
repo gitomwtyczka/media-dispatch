@@ -1,8 +1,8 @@
 {
   "callsign": "media-strateg",
-  "status": "handoff",
-  "current_task": "Handoff po sesji 01.09.2026",
-  "timestamp": "2026-09-01T18:50:00+02:00",
+  "status": "working",
+  "current_task": "Nowa sesja po handoff — diagnoza buga Gmail (crimson-void) + dispatch",
+  "timestamp": "2026-09-01T18:56:00+02:00",
   "last_completed": [
     "PressAI pipeline end-to-end — WP draft kurier365 #88470",
     "GmailSource prepare-article — commit 289d878",
