@@ -32,6 +32,9 @@ class GmailSource(SourcePlugin):
         'bialykruk.pl': {'name': 'Biały Kruk', 'priority': 8, 'portal': 'kurier365'},
         'rudinski': {'name': 'Cezary Rudiński', 'priority': 9, 'portal': 'kurier365'},
         'rudzinski': {'name': 'Cezary Rudiński', 'priority': 9, 'portal': 'kurier365'},
+        'pluzanski': {'name': 'T. Płużański', 'priority': 9, 'portal': 'kurier365'},
+        't_pluzanski': {'name': 'T. Płużański', 'priority': 9, 'portal': 'kurier365'},
+        'tomasz.pluzanski': {'name': 'T. Płużański', 'priority': 9, 'portal': 'kurier365'},
         'binczyk': {'name': 'Arkadiusz Bińczyk', 'priority': 8, 'portal': 'kurier365'},
         'arkadiusz.binczyk': {'name': 'Arkadiusz Bińczyk', 'priority': 8, 'portal': 'kurier365'},
 
