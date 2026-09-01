@@ -44,7 +44,7 @@ Portal `kurier365.pl` opiera się na miksie komunikatów agencyjnych, stałych a
 | **Arkadiusz Bińczyk** | Gmail API (`tobroz@gmail.com`) | **Wysoki (P1)** | Publicystyka, historia, felietony, sprawy społeczne. Wiadomości spływają z co najmniej 3 różnych adresów e-mail. Parsowanie treści maila oraz załączników `.docx`/`.pdf`. | **Półautomatyczna** (weryfikacja kategoryzacji WP i dopasowania tytułu). |
 | **WEI (Warsaw Enterprise Institute)** | Gmail API (filtr domeny `@wei.org.pl`) | **Wysoki (P1)** | Analizy wolnorynkowe, gospodarka, podatki, komentarze eksperckie. Ekstrakcja tez głównych i generowanie przystępnego omówienia pod kątem czytelnika masowego. | **Półautomatyczna** (selekcja tez pod Discover / format Q&A). |
 | **Biały Kruk** | Gmail API (domena `@bialykruk.pl`) | **Średni (P2)** | Materiały wydawnicze, kultura, historia, recenzje książkowe, fragmenty publikacji. Ekstrakcja okładek i not biograficznych autorów. | **Półautomatyczna** (przypisanie do działu Kultura/Historia). |
-| **Newseria (Ogólna / Lifestyle / Innowacje)** | Web Scraping po zalogowaniu | **Średni (P2)** | Depesze agencyjne, wywiady, wideo/audio. Wykorzystanie konta redakcyjnego (login/hasło). Selekcja tematów społecznych, konsumenckich i technologicznych. | **Automatyczna wstępna** + zatwierdzenie w Telegramie. |
+| **Newseria (Ogólna / Lifestyle / Innowacje)** | Web Scraping po zalogowaniu | **Średni (P2)** | Depesze agencyjne, wywiady, wideo/audio. Wykorzystanie konta redakcyjnego (login/hasło). Selekcja tematów społecznych, konsumenckich i technologicznych. | **Automatyczna wstępna** + zatwierdzenie w Discordzie (`#editorial-kurier365`). |
 | **Dział NAUKA (RSS Feed Crawler)** | RSS / Atom Crawler | **Średni (P2)** | Monitoring serwisów naukowych (PAP Nauka w Polsce, serwisy uczelniane, czasopisma popularnonaukowe). Tłumaczenie żargonu akademickiego na format popularnonaukowy. | **Automatyczna** (ranking merytoryczny i potencjał Discover). |
 | **Każdy inny dział (RSS Feed Crawler)** | RSS / Atom Crawler | **Normalny (P3)** | Ogólny monitoring 30-minutowy (społeczeństwo, rynek pracy, CSR, zdrowie, kultura). | **Automatyczna** (scoring merytoryczny i deduplikacja). |
 | **Gmail tobroz@gmail.com (Pozostałe PR)** | Gmail API | **Normalny (P3)** | Standardowe komunikaty agencji PR, informacje prasowe firm. Filtr antyspamowy i scoring jakościowy. | **Automatyczna selekcja** (odrzucanie spamu i czystej reklamy). |
@@ -120,63 +120,78 @@ Każdy materiał pobrany z Newserii przed skierowaniem do kolejki BiznesCiti prz
 
 ---
 
-## 4. Flow Redaktora Naczelnego AI — Kanał Wewnętrzny
+## 4. Flow Redaktora Naczelnego AI — Discord Editorial Center
 
 ### 4.1. Porównanie Opcji Kanału Decyzyjnego
 
-| Parametr | Opcja A: Telegram Bot (Rekomendowane MVP) | Opcja B: Google Sheets (Control Center) | Opcja C: Dedykowana WebApp |
+| Parametr | Opcja A: Discord Editorial Center (Rekomendowane) | Opcja B: Google Sheets (Control Center) | Opcja C: Dedykowana WebApp |
 |---|---|---|---|
-| **Czas wdrożenia (Time-to-Value)** | 🟢 **1–2 dni robocze** | 🟡 3–4 dni robocze | 🔴 2–3 tygodnie |
-| **UX na urządzeniach mobilnych** | 🟢 **Idealny** (natywne powiadomienia push, 1-tap akcje) | 🟡 Uciążliwy (wymaga otwierania arkusza na telefonie) | 🟡 Wymaga logowania w przeglądarce |
-| **Szybkość podejmowania decyzji** | 🟢 **Błyskawiczna** (średnio 5–10 sekund na kandydata) | 🟡 Średnia (ręczne przełączanie dropdownów) | 🟢 Dobra |
-| **Dwukierunkowa interakcja (Uwagi)** | 🟢 **Natywna** (odpowiedź tekstem/głosem w czacie bota) | 🔴 Słaba (wpisywanie tekstu w małą komórkę) | 🟢 Dobra (formularz uwag) |
-| **Odporność na awarie i limity API** | 🟢 Bardzo wysoka (Telegram Bot API) | 🔴 Ryzyko rate-limitów Google Sheets API | 🟢 Wysoka |
+| **Czas wdrożenia (Time-to-Value)** | 🟢 **1–2 dni robocze** (FastAPI Interactions + Webhooks) | 🟡 3–4 dni robocze | 🔴 2–3 tygodnie |
+| **UX na urządzeniach mobilnych i desktop** | 🟢 **Idealny** (natywne powiadomienia push, rich embeds, 5 przycisków Action Row, podział na kanały) | 🟡 Uciążliwy (wymaga otwierania arkusza na telefonie) | 🟡 Wymaga logowania w przeglądarce |
+| **Szybkość podejmowania decyzji** | 🟢 **Błyskawiczna** (1-tap akcja, średnio 3–5 sekund na kandydata) | 🟡 Średnia (ręczne przełączanie dropdownów) | 🟢 Dobra |
+| **Dwukierunkowa interakcja (Uwagi)** | 🟢 **Natywna przez Discord Modal** (formularz na uwagi redakcyjne bez zaśmiecania czatu) | 🔴 Słaba (wpisywanie tekstu w małą komórkę) | 🟢 Dobra (formularz uwag) |
+| **Odporność na awarie i limity API** | 🟢 **Bardzo wysoka** (Discord Webhook & Interactions API) | 🔴 Ryzyko rate-limitów Google Sheets API | 🟢 Wysoka |
 
-### 4.2. Rekomendacja Architektoniczna: Telegram Bot (`redaktor-naczelny-bot`)
+### 4.2. Rekomendacja Architektoniczna: Discord Editorial Center (`redaktor-naczelny-discord`)
 
-Rekomendujemy **Telegram Bot** jako główny interfejs operacyjny Redaktora Naczelnego, wsparty lokalną bazą SQLite (`shared/state/editorial_queue.db`) oraz rejestrem publikacji.
+Rekomendujemy **Discord Editorial Center** jako główny interfejs operacyjny Redaktora Naczelnego, oparty na bezstanowym **Discord Interactions API** (bez konieczności utrzymywania stałego połączenia WebSocket bota).
 
-#### Format Prezentacji Kandydata w Telegramie:
+#### Discord Technical Flow
 
-```text
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📰 [KURIER365.PL] Kandydat do publikacji #K-1042
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📌 Tytuł: UOKiK nakłada 14 mln zł kary na operatora telekomunikacyjnego
-🏢 Źródło: Oficjalny Komunikat UOKiK | Priorytet: P0 (Krytyczny)
-⏱ Data ingestu: 31.08.2026 14:30 | Dział docelowy: Prawo & Finanse
+```
+Architektura: Discord Interactions API (NIE websocket bot)
+- Worker → Discord Webhook → Rich Embed z 5 przyciskami
+- Klik przycisku → Discord POST do FastAPI endpoint (/api/v1/discord/interactions)
+- Weryfikacja ed25519 signature
+- Dispatch do pressai-worker / kurier365-worker
 
-📝 Resume redakcyjne (260 znaków):
-Prezes UOKiK ukarał operatora za bezprawne włączanie płatnych pakietów subskrypcyjnych bez wyraźnej zgody abonentów. Decyzja nakazuje zwrot nienależnie pobranych środków dla ponad 250 tys. klientów oraz zmianę regulaminu.
+Kanały Discord (serwer Impresja):
+- #editorial-prawy      — nowe filmy YT dla prawy.pl
+- #editorial-kurier365   — kandydaci Gmail/RSS
+- #editorial-biznesciti  — kandydaci biznesowe
+- #pressai-production   — log wygenerowanych draftów
 
-🎯 Sugerowany format PressAI: Alert Konsumencki + Poradnik Discover (FAQ JSON-LD)
-🔗 Link do źródła: https://uokik.gov.pl/aktualnosci/komunikat-1042
+Przyciski (Action Row):
+[✅ Akceptuj] [❌ Odrzuć] [⏰ Odrocz D+1] [⏰ Odrocz D+7] [💬 Uwagi]
 
-Wybierz akcję redakcyjną poniżej:
+Uwagi przez Discord Modal (nie chat) → custom_instructions do PressAI
 ```
 
-#### Przyciski Inline pod wiadomością:
+#### Format Prezentacji Kandydata w Discordzie (Rich Embed):
+
+- **Tytuł:** `[KANDYDAT] Tytuł artykułu`
+- **Kolor embeda:**
+  - 🟡 Żółty (`#F1C40F`) — nowy kandydat oczekujący na decyzję
+  - 🟢 Zielony (`#2ECC71`) — zaakceptowany / draft utworzony
+  - 🔴 Czerwony (`#E74C3C`) — odrzucony
+  - 🟣 Fioletowy / Szary (`#95A5A6`) — odroczony
+- **Pola Embed:**
+  - 📰 **Źródło:** [nazwa źródła] | **Priorytet:** P0/P1/P2
+  - 📝 **Resume:** max 300 znaków (synteza problemu / decyzji)
+  - 🔗 **Oryginał:** [link do materiału źródłowego]
+  - 📅 **Data:** [timestamp]
+  - 📈 **Trend Score:** [X.XX] (z Content Radar)
+  - 🎯 **Sugerowany format:** Alert Konsumencki / Analityczny / Q&A Discover
+
+#### Przyciski Akcji (Action Row pod Embedem):
 ```
-[ ✅ Akceptuj (Generuj Draft WP) ]    [ ❌ Odrzuć ]
-[ ⏰ Odrocz D+1 (Jutro rano) ]        [ ⏰ Odrocz D+7 (Za tydzień) ]
-[ 💬 Dodaj uwagi redakcyjne ]
+[ ✅ Akceptuj ]  [ ❌ Odrzuć ]  [ ⏰ Odrocz D+1 ]  [ ⏰ Odrocz D+7 ]  [ 💬 Uwagi ]
 ```
 
 #### Logika obsługi akcji redaktora:
 1. **`✅ Akceptuj`**:
-   - Bot zmienia status kandydata na `approved`.
+   - Endpoint `/api/v1/discord/interactions` weryfikuje podpis ed25519 i zmienia status kandydata na `approved`.
    - Wysyła task do kolejki `pressai-worker` z przypisanym playbookiem portalu.
    - `pressai-worker` generuje artykuł w standardzie 5 bloków HTML + SEO i tworzy wpis `draft` w WordPressie.
-   - Bot aktualizuje wiadomość na Telegramie: `✅ ZAAKCEPTOWANO -> Artykuł utworzony w WP jako DRAFT (ID: #87490) w 48s`.
+   - Bot edytuje oryginalną wiadomość embed na Discordzie (zielony kolor, dodany link do draftu WP: `✅ ZAAKCEPTOWANO -> Artykuł utworzony w WP jako DRAFT (ID: #87490)`).
 2. **`❌ Odrzuć`**:
-   - Status zmieniony na `rejected`. Wiadomość oznaczana jako `❌ ODRZUCONO`.
+   - Status zmieniony na `rejected`. Embed zaktualizowany na czerwono (`❌ ODRZUCONO`).
 3. **`⏰ Odrocz D+1 / D+7`**:
    - Kandydat otrzymuje timestamp wznowienia (`wake_up_at = now() + 24h / 7d`).
-   - Wiadomość znika lub otrzymuje status `⏰ ODROCZONO DO [DATA]`.
-4. **`💬 Dodaj uwagi redakcyjne`**:
-   - Bot wysyła prompt: *"Napisz lub podyktuj uwagi dla PressAI (np. 'Zwróć uwagę na instrukcję jak odzyskać pieniądze z reklamacji'):"*.
-   - Redaktor wysyła wiadomość tekstową w odpowiedzi.
-   - Bot zapisuje uwagę w `custom_instructions` kandydata i automatycznie zatwierdza zlecenie do PressAI z uwzględnieniem tych wytycznych.
+   - Embed zaktualizowany o informację o odroczeniu.
+4. **`💬 Uwagi` (Discord Modal)**:
+   - Discord otwiera okno modalne z polem tekstowym: *"Uwagi redakcyjne dla PressAI (np. 'Zwróć uwagę na instrukcję jak odzyskać pieniądze z reklamacji')"*.
+   - Po zatwierdzeniu modala treść trafia do `custom_instructions` kandydata i automatycznie zatwierdza zlecenie do PressAI z uwzględnieniem tych wytycznych.
 
 ---
 
@@ -254,7 +269,7 @@ Worker działający w pętli (cron co 15–30 minut) podpięty pod skrzynkę `to
   2. **Filtr jakościowy:** eliminacja zdjęć nieostrych, o złym naświetleniu lub zbyt małej rozdzielczości.
   3. **Wybór reprezentatywny:** Wybór **4–6 najlepszych kadrów** prezentujących różne plany (szeroki kadr na zabytek/krajobraz, detal architektoniczny, ujęcie klimatyczne).
   4. **Konwersja:** Przekształcenie do formatu WebP (kompresja 82%, max bok 1920px), wygenerowanie SEO ALT tagów opartych na tekście artykułu.
-  5. **Podgląd w Telegramie:** Bot wysyła kandydata z miniaturami wybranych 4 zdjęć do zatwierdzenia.
+  5. **Podgląd w Discordzie:** Webhook wysyła embed z miniaturami wybranych zdjęć do zatwierdzenia na kanale `#editorial-kurier365`.
 
 #### 2. Arkadiusz Bińczyk — Wieloadresowość i Formaty:
 - **Specyfika:** Wiadomości przychodzą z co najmniej 3 różnych skrzynek mailowych autora (WP, Interia, domena zawodowa).
@@ -306,7 +321,7 @@ Aby jak najszybciej uruchomić produkcję, wdrażamy komponenty w 3 kolejnych sp
 
 ### 🚀 TOP 3 Workery do Zbudowania w Pierwszej Kolejności:
 1. **`gmail-kurier365-worker`** — kluczowy worker ingestu dla Kurier365.pl (obsługa skrzynki `tobroz@gmail.com`, whitelist nadawców: Rudiński z photo-curatorem, Bińczyk, WEI, Biały Kruk).
-2. **`redaktor-naczelny-bot` (Telegram)** — serce orkiestracji i jedyny wymagany interfejs ludzki (prezentacja kandydatów z linkami i przyciskami Akceptuj / Odrzuć / Odrocz / Uwagi).
+2. **`redaktor-naczelny-discord` (Discord Editorial Center)** — serce orkiestracji i jedyny wymagany interfejs ludzki (prezentacja kandydatów w dedykowanych kanałach Discord z embedami i 5 przyciskami: Akceptuj / Odrzuć / Odrocz D+1 / Odrocz D+7 / Uwagi przez Modal).
 3. **`feed-crawler-worker` (Nauka, UOKiK, ISBNews)** — automatyzacja zbierania depesz krytycznych dla Kurier365 (UOKiK, Nauka) oraz BiznesCiti (ISBNews).
 
 *(Następny krok po uruchomieniu TOP 3: `newseria-connector` z filtrem Eco-Bias oraz `biznesciti-worker`).*
