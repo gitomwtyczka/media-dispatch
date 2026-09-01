@@ -1,13 +1,14 @@
 {
-  "callsign": "media-dev-34",
-  "status": "done",
-  "current_task": "Poprawki do pipeline'u generowania + Sheets + docs",
-  "timestamp": "2026-09-01T12:41:00+02:00",
+  "callsign": "media-dev-40",
+  "status": "working",
+  "current_task": "Implementacja Content Radar jako filtr/wzmacniacz kandydatów (RadarEnricher)",
+  "timestamp": "2026-09-01T18:40:40+02:00",
   "last_completed": [
-    "Utworzenie docs/publication-flow.md — commit 3d66c80e97f225ddac44ece390d7c7aa859399f5 (2026-09-01)",
-    "Aktualizacja agents/kurier365-worker/worker.py — commit d6eb8ea5a75383447c95831493106e0e9422dbdc (2026-09-01)",
-    "Dodanie kolumn S i T (Prompt obraz 1, Prompt obraz 2) do arkusza Kandydaci w Google Sheets (2026-09-01)",
-    "Raport wdrożeniowy w .agents/reports/ — commit 07849b35550da7a47ab490baaf3ba3b9f4e8bd50 (2026-09-01)"
+    "Poprawki do pipeline'u generowania + Sheets + docs (media-dev-34)"
   ],
-  "pending": []
+  "pending": [
+    "agents/base/trend_signals/radar_enricher.py",
+    "agents/kurier365-worker/worker.py",
+    ".env.example"
+  ]
 }
