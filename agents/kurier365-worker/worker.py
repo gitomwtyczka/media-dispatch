@@ -174,7 +174,8 @@ class Kurier365Worker(WorkerBase):
         Args:
             config: nadpisz domyślną konfigurację CONFIG (opcjonalne).
         """
-        effective_config = {**CONFIG, **(config or {})}\n        super().__init__(effective_config)
+        effective_config = {**CONFIG, **(config or {})}
+        super().__init__(effective_config)
 
         pressai_url = effective_config['pressai_url']
         pressai_token = effective_config.get('pressai_token')
