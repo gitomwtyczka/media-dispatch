@@ -21,7 +21,7 @@ CLI:
   python worker.py --run --json           # output jako JSON
 
 Status wdrożenia:
-  FeedCrawlerSource v1.0 — LIVE (13k+ feedów, crawler.impresjapr.pl).
+  FeedCrawlerSource v1.1 — LIVE (13k+ feedów, crawler.impresjapr.pl).
   Content Radar LIVE — aktywny gdy CONTENT_RADAR_JWT ustawiony.
   Aktywacja źródeł: dodaj token PressAI i dane logowania w CONFIG.
 """
@@ -145,7 +145,7 @@ class Kurier365Worker(WorkerBase):
         self.add_source(FeedCrawlerSource(
             api_url=feed_crawler_url,
             portal='kurier365',
-            categories=['prawo', 'konsument', 'uokik', 'gospodarka', 'nauka', 'pap', 'biznes', 'finanse'],
+            categories=['prawo', 'konsument', 'uokik', 'gospodark', 'nauka', 'pap', 'biznes', 'finans', 'podatk', 'rynek', 'wnp', 'inflacj', 'cen', 'pols'],
             hours_back=6,
             limit=50,
             state_file='/tmp/feed_crawler_state_kurier365.json'
