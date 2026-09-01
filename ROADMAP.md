@@ -37,25 +37,27 @@ je na wiele platform jednoczesnie.
 - Bezpieczeństwo i Human-in-the-Loop: WP=draft, YT=unlisted
 - Wzbogacanie trendami z Content Radar (`radar.impresjapr.pl`)
 
-### FAZA 2: Multi-portal Daily Production (Kurier365.pl, BiznesCiti.com, Prawy.pl)
+### FAZA 2: Pipeline publikacji Kurier365 + Gmail Stream (w toku)
 
-**✅ MVP v0.1 skeleton gotowy (31.08.2026) — media-dev-architect**
+**✅ MVP v0.1 skeleton + źródła aktywne (31.08–01.09.2026) — media-dev-architect, media-dev-30, media-dev-31**
 
 Zaimplementowano rozszerzalną architekturę Plugin-based Workers:
 
 #### agents/base/ — bazowa architektura workerów
 - `worker_base.py` — WorkerBase, SourcePlugin, TrendSignal, ContentCandidate
-- `sources/gmail_source.py` — GmailSource (whitelist), RSSSource (feeds)
+- `sources/gmail_source.py` — GmailSource (PressAI Gmail API, tobroz@gmail.com, priorytetowi nadawcy P0)
+- `sources/feed_crawler_source.py` — FeedCrawlerSource (13k+ feedów RSS, crawler.impresjapr.pl, działy tematyczne)
 - `sources/newseria_source.py` — NewseriaSource z Eco-Bias Gate
 - `sources/youtube_channel_source.py` — YouTubeChannelSource dla monitorowania kanałów YT
+- `trend_signals/geo_relevance_signal.py` — GeoRelevanceSignal (priorytetyzacja PL/EU/US-biznes)
 - `trend_signals/content_radar_signal.py` — **LIVE** integracja z radar.impresjapr.pl
 - `trend_signals/google_trends_signal.py` — fallback placeholder
 
 #### agents/kurier365-worker/ — pierwsza instancja WorkerBase
 - `worker.py` — Kurier365Worker (kurier365.pl)
-  - Sources: Gmail (Rudziński, Bińczyk, WEI, Biały Kruk), RSS (UOKiK, PAP, Nauka, ISBNews), Newseria
-  - Trend Signals: ContentRadarSignal (LIVE gdy CONTENT_RADAR_JWT), Google/Social (fallback)
-  - CLI: --health, --run, --top N, --json
+  - Sources: Gmail (Rudiński, Bińczyk, WEI, Biały Kruk, Juchniewicz, Bolek, Zabka, Maxmedia, Gryżewski, Kalinowska, Art-Media, Fundacja XBW), FeedCrawler (UOKiK, PAP, Nauka, ISBNews, Nauki ścisłe, Geopolityka), Newseria
+  - Trend Signals: GeoRelevanceSignal (LIVE), ContentRadarSignal (LIVE gdy CONTENT_RADAR_JWT), Google/Social (fallback)
+  - CLI: --health, --run, --top N, --sheets, --json
 
 #### agents/prawy-youtube-worker/ — dedykowany worker kanału YT Studio Prawy_PL
 - `worker.py` — PrawyYouTubeWorker (prawy.pl)
@@ -64,15 +66,19 @@ Zaimplementowano rozszerzalną architekturę Plugin-based Workers:
   - Pipeline VSE: generate SEO -> inject WP draft -> shorts candidates -> editorial review
   - CLI: --health, --video-id, --run
 
-#### Następne kroki w Fazie 2:
-- **`gmail-kurier365-worker`** — aktywacja GmailSource (token PressAI + PressAI Gmail API)
-- **`feed-crawler-worker`** — implementacja RSSSource (feedparser lub feed-crawler serwis)
-- **`newseria-connector`** — implementacja scraping sesyjny Newseria
-- **`redaktor-naczelny-discord`** — FastAPI Interactions endpoint (`/api/v1/discord/interactions`) + Discord Webhooks + Embeds z przyciskami (Action Row: Akceptuj, Odrzuć, Odrocz D+1, Odrocz D+7, Uwagi przez Modal)
-- **`biznesciti-worker`** — nowa instancja WorkerBase dla biznesciti.com
+#### Następne kroki w Fazie 2 (Pipeline publikacji):
+- **`pressai-publisher-integration`** — połączenie selekcji kandydatów z generowaniem i auto-draftem w WordPress dla kurier365.pl (`POST /api/editor/generate` + `POST /api/publisher/publish/{id}`)
+- **`newseria-connector`** — scraping sesyjny Newseria
+- **`biznesciti-worker`** — instancja WorkerBase dla biznesciti.com
 - **`pressai-worker`** — rozszerzenie o playbooki per portal
 
-### FAZA 3: Content Radar Worker
+### FAZA 3: Discord Editorial Center (Future) `[odroczone 01.09.2026 — priorytet: uruchomienie publikacji]`
+- Interaktywne centrum redakcyjne na Discordzie
+- FastAPI Interactions endpoint (`/api/v1/discord/interactions`) + Discord Webhooks + Embeds z przyciskami (Action Row: Akceptuj, Odrzuć, Odrocz D+1, Odrocz D+7, Uwagi przez Modal)
+- Dual-channel workflow: `#editorial-propozycje` + `#editorial-priority`
+- Komunikacja dwukierunkowa: akceptacja tematu przez redaktora wyzwala automatyczny pipeline generacji i publikacji
+
+### FAZA 4: Content Radar Worker
 - **GOTOWE na produkcji (31.08.2026)** — radar.impresjapr.pl
 - Google Trends API (pytrends, geo=PL, 7d)
 - Social media trending (Twitter/X, TikTok, Instagram, YouTube, Reddit, FB, LinkedIn)
@@ -81,18 +87,18 @@ Zaimplementowano rozszerzalną architekturę Plugin-based Workers:
 - Integracja: `ContentRadarSignal` w `agents/base/trend_signals/`
 - Endpoint: `GET /api/v1/trending/global` (wymaga JWT + plan Pro)
 
-### FAZA 4: Redaktor Naczelny (Zaawansowana Meta-Orkiestracja)
+### FAZA 5: Redaktor Naczelny (Zaawansowana Meta-Orkiestracja)
 - Syntetyzuje dane z Intelligence
 - Proponuje tematy per portal
 - Po GO usera -> dispatch do producentow
 - Raport tygodniowy: editorial/YYYY-WW_propozycje.md
 
-### FAZA 5: Multi-platform Distribution
+### FAZA 6: Multi-platform Distribution
 - YouTube worker: upload + scheduling
 - TikTok worker: shorty z VSE
 - Telegram worker: bot API (dystrybucja kanałowa)
 
-### FAZA 5b: TikTok Upload (Gotowe Shorty _gotowy.mp4)
+### FAZA 6b: TikTok Upload (Gotowe Shorty _gotowy.mp4)
 - Integracja `tiktok-worker` z lokalną bazą wideo `C:\VSE\Shorts\`
 - Quality Gate: publikacja wyłącznie plików ze statusem/sufiksem `*_gotowy.mp4` po akceptacji człowieka
 - Wykorzystanie pakietów SEO (hook, opis, hashtagi) wygenerowanych przez Short Machine
@@ -123,8 +129,8 @@ Kazdy worker musi implementowac:
 1. VSE worker / prawy-studio-worker / prawy-youtube-worker v1.0 - zaimplementowany (01.09.2026)
 2. shorts-agent + Short Machine - API gotowe na produkcji od 31.08.2026 (`/v1/shorts/describe`), implementacja workers: Q1 09.2026
 3. pressAI worker - kluczowy dla skali
-4. **kurier365-worker skeleton v0.1** - architektura gotowa (31.08.2026), aktywacja źrodet: Faza 2
+4. **kurier365-worker + Gmail Stream (Faza 2)** — aktywne zbieranie kandydatów, priorytet: uruchomienie publikacji (01.09.2026)
 5. Content Radar (radar.impresjapr.pl) - LIVE na produkcji (31.08.2026)
-6. redaktor-naczelny-discord (Discord Editorial Center) - FastAPI Interactions + Webhooks + Action Row przyciski i modale
+6. **Discord Editorial Center (Faza 3 Future)** — odroczone na rzecz uruchomienia publikacji (01.09.2026)
 7. newseria-connector + biznesciti-worker
 8. TikTok distribution - po walidacji flow _gotowy.mp4
