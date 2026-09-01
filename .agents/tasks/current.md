@@ -1,17 +1,14 @@
-## ✅ Zamknięte (01.09.2026)
-- PressAI pipeline end-to-end (WP draft kurier365 #88470)
-- GmailSource prepare-article flow
-- RadarEnricher v1.0 per-portal
-- Sheets Kandydaci (kolory + prompt obrazy)
-- ROADMAP split A/B
-- Content Radar architektura (Opcja 1)
-- PRESSAI_JWT_USER + crontab fix
+## ✅ Zamknięte (02.09.2026)
+- Shorty YT (6 nowych filmów 1 września) dopasowane do VSE, zaktualizowane w YT i Excelu.
+- Arkusz "Shorty" posiada poprawne integracje z kontem SA
+- Naprawiono halucynacje z VSE API poprzez wpompowanie tekstów bezpośrednio ze zweryfikowanych Short Candidates
+- Collaborate Link (Draft) fix URL resolving in WP snippet
 
-## 🟡 W toku
-- RadarEnricher commit (40c) — powinno być done
+## 🟡 W toku (Handoff)
+- 5 starszych shortów wgranych 30 sierpnia do YouTube (wiersze 6-10 arkusza 'Shorty') potrzebuje publikacji opisów z VSE na YouTube. (Szczegóły w CURRENT_BRIEF.md).
 
 ## 🔵 Następne
-1. KRYTYCZNE: Fix Gmail 500 w crimson-void (NULL google_credentials)
-2. Content Radar API discovery
-3. Pełny run kurier365-worker (Radar + Geo)
-4. Prawy.pl portal profile fix
+1. KRYTYCZNE: Zrobić worker dla starych shortów
+2. YouTube SEO historyczny update (yt-seo-backlog)
+3. Fix Gmail 500 w crimson-void (NULL google_credentials)
+4. Pełny run kurier365-worker (Radar + Geo)
