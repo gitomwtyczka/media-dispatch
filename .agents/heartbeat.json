@@ -1,18 +1,14 @@
 {
   "callsign": "media-strateg",
   "status": "working",
-  "current_task": "Nowa sesja po handoff — diagnoza buga Gmail (crimson-void) + dispatch",
-  "timestamp": "2026-09-01T18:56:00+02:00",
+  "current_task": "Delegowanie aktualizacji 5 starych shortów (z 30.08) do workera media-dev-01",
+  "timestamp": "2026-09-02T00:28:00+02:00",
   "last_completed": [
-    "PressAI pipeline end-to-end — WP draft kurier365 #88470",
-    "GmailSource prepare-article — commit 289d878",
-    "RadarEnricher v1.0 — commit media-dev-40c",
-    "Sheets Kandydaci (prompt obrazy, kolory)",
-    "ROADMAP split A/B — commit 67d3094"
+    "Handoff shorts (media-strateg 129 steps)",
+    "Shorts update Wolińska, Nil, Rulewski (2026-09-02_media-strateg_shorts_fix.md)"
   ],
   "pending": [
-    "Fix Gmail 500 w crimson-void (NULL google_credentials) — KRYTYCZNE",
-    "Content Radar API discovery",
-    "Pełny run kurier365-worker z Radar+Geo"
+    "Aktualizacja 5 shortów z 30 sierpnia przez workera",
+    "Zaplanowanie publikacji shortów na 5-9 września"
   ]
 }
