@@ -3,7 +3,7 @@
 Reguły specyficzne dla workspace `media-dispatch`.
 Uzupełnia `RULE[user_global]` — nie zastępuje.
 
-> Ostatnia aktualizacja: 2026-09-01 | media-dev-22
+> Ostatnia aktualizacja: 2026-09-01 | media-dev-29
 
 ---
 
@@ -46,6 +46,11 @@ na wiele platform bez ręcznej pracy redakcyjnej.
 ### Warstwa 2 — Editorial
 - `redaktor-naczelny` — Discord Editorial Center (Discord Interactions API + Webhooks na serwerze Impresja; kanały #editorial-prawy, #editorial-kurier365, #editorial-biznesciti; obsługa przycisków akcji i modali uwag)
   > *Uwaga: Infrastruktura Discord istnieje już w crimson-void jako webhook notifier (`backend/discord_notifier.py`), rozszerzamy o FastAPI Interactions endpoint.*
+
+### Kanały Discord (dwa dla kurier365)
+- #editorial-kurier365 — WSZYSTKIE kandydaci (DISCORD_WEBHOOK_KURIER365)
+- #editorial-priority — TYLKO P0 i Gmail współpracownicy (DISCORD_WEBHOOK_PRIORITY)
+Duplikacja OK: priorytetowe pojawiają się na obu kanałach.
 
 ### Warstwa 3 — Production
 - `vse-worker` — video → transkrypcja Whisper → SEO + shorty + draft WP
@@ -216,4 +221,5 @@ Worker MOŻE odkładać tymczasową wiedzę w scratch swojego workspace
 *Rozbudowa: Supervisor 01 | sonic-void | 29.08.2026 — VSE infra, kanały, pre-flight*  
 *Rozbudowa: media-strateg | 30.08.2026 — Dispatch Protocol, self-contained scripts, hierarchia wiedzy*  
 *Rozbudowa: media-dev-06 | 31.08.2026 — reguła publikowania bezwzględna, Short Machine*  
-*Rozbudowa: media-dev-22 | 01.09.2026 — Discord Editorial Center w architekturze*
+*Rozbudowa: media-dev-22 | 01.09.2026 — Discord Editorial Center w architekturze*  
+*Rozbudowa: media-dev-29 | 01.09.2026 — dual-channel Discord (#editorial-priority + #editorial-kurier365)*
