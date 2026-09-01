@@ -22,6 +22,37 @@ je na wiele platform jednoczesnie.
 - Wyjscie: artykul na portal WordPress
 - Mapowanie API pressAI
 
+## Architektura dwutorowa (01.09.2026)
+
+### Ścieżka A — Editorial (główna)
+```
+Intelligence (feed-crawler + Gmail P0 + GeoRelevance)
+    ↓
+Sheets Kandydaci (kolejka redakcyjna)
+    ↓ [Redaktor Naczelny AI zatwierdza]
+PressAI Klastry + Planowanie
+    ↓
+PressAI Generowanie (phrases + AI) + Quality
+    ↓
+WP Draft → [ręczna publikacja]
+```
+
+### Ścieżka B — Auto-batch (boczna / eksperymentalna)
+```
+Intelligence (feed-crawler + Gmail P0 + GeoRelevance)
+    ↓
+Auto-generate via PressAI API (kurier365-worker)
+    ↓
+PressAI historia → [user dodaje obrazki] → WP Draft
+```
+*Używana dla: treści szybkich, kandydatów P2-P3, eksperymenty*
+*Kandydaci P0 (Gmail) zawsze przez Ścieżekę A*
+
+### Content Radar — brakująca integracja
+- **Aktualny status:** autonomiczny projekt (radar.impresjapr.pl) BEZ integracji z PressAI
+- **Potencjał:** wskazuje trendy social media → powinna informować wybory klastrów i fraz w PressAI
+- **Planowana integracja:** Faza 3 — Content Radar → PressAI phrase selection + cluster prioritization
+
 ### FAZA 1b: shorts-agent + Short Machine Integration (API gotowe na produkcji od 31.08.2026. Implementacja workers: Q1 09.2026)
 - Skanowanie opublikowanych shortów na kanale YouTube Studio Prawy_PL (`UCoH2G9By4OX3kcLsc8lHgDw`)
 - Audyt jakości SEO i automatyczne generowanie brakujących opisów przez **Short Machine** (`POST /v1/shorts/describe`)
