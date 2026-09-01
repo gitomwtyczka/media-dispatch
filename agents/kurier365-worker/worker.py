@@ -2,7 +2,7 @@
 """agents/kurier365-worker/worker.py
 
 Kurier365Worker — instancja WorkerBase dla kurier365.pl i biznesciti.com
-media-dispatch | media-dev-34 | 01.09.2026
+media-dispatch | media-dev-36 | 01.09.2026
 
 Architektura rozszerzalna (plugin-based):
   Sources:
@@ -83,7 +83,7 @@ CONFIG = {
     'state_file': str(Path(__file__).parent / 'kurier365_state.json'),
 
     # Token PressAI — uzupełnij przez docker exec lub secrets manager
-    'pressai_token': os.environ.get('PRESSAI_JWT') or os.environ.get('PRESSAI_TOKEN'),
+    'pressai_token': os.environ.get('PRESSAI_JWT_USER') or os.environ.get('PRESSAI_JWT') or os.environ.get('PRESSAI_TOKEN'),
 
     # Dane logowania Newseria — uzupełnij gdy konto gotowe
     'newseria_username': os.environ.get('NEWSERIA_USER'),
@@ -125,9 +125,14 @@ def _should_auto_publish(candidate: ContentCandidate) -> bool:
     return any(kw in source_lower for kw in ['zabka', 'żabka', 'juchniewicz', 'rudzinski', 'rudinski'])
 
 
-def build_generate_payload(candidate: ContentCandidate, target_portal: str) -> dict:
+def build_generate_payload(
+    candidate: ContentCandidate,
+    target_portal: str,
+    selected_phrase: str = '',
+    secondary_phrases: list = None
+) -> dict:
     """Buduje payload do POST /api/editor/generate w PressAI."""
-    return {
+    payload = {
         'title': candidate.title,
         'source_text': candidate.raw_content or candidate.summary or candidate.title,
         'source_url': candidate.content_url,
@@ -144,6 +149,11 @@ def build_generate_payload(candidate: ContentCandidate, target_portal: str) -> d
         'generate_faq': True,
         'min_words': 600,  # parametr minimalnej liczby słów PressAI
     }
+    if selected_phrase:
+        payload['selected_phrase'] = selected_phrase
+    if secondary_phrases:
+        payload['secondary_phrases'] = secondary_phrases
+    return payload
 
 
 # ---------------------------------------------------------------------------
@@ -347,11 +357,43 @@ class Kurier365Worker(WorkerBase):
         self.add_trend_signal(SocialTrendsSignal())
 
     def _get_auth_headers(self) -> dict:
-        token = self.pressai_token or os.environ.get('PRESSAI_JWT') or os.environ.get('PRESSAI_TOKEN')
+        token = self.pressai_token or os.environ.get('PRESSAI_JWT_USER') or os.environ.get('PRESSAI_JWT') or os.environ.get('PRESSAI_TOKEN')
         headers = {'Content-Type': 'application/json'}
         if token:
             headers['Authorization'] = f'Bearer {token}'
         return headers
+
+    def _get_seo_phrases(self, source_text: str, source_url: str, portal_name: str, portal_url: str) -> tuple:
+        """Pobiera frazy SEO z PressAI phrase-candidates.
+        Zwraca: (selected_phrase: str, secondary_phrases: list[str])
+        """
+        token = self.pressai_token or os.environ.get('PRESSAI_JWT_USER') or os.environ.get('PRESSAI_JWT') or os.environ.get('PRESSAI_TOKEN', '')
+        if not token:
+            return '', []
+
+        try:
+            payload = {
+                'source_text': source_text[:2000],
+                'target_portal': portal_name,
+                'site_url': portal_url
+            }
+            r = requests.post(
+                f"{self.pressai_url}/api/editor/phrase-candidates",
+                json=payload,
+                headers={'Authorization': f'Bearer {token}'},
+                timeout=30
+            )
+            if r.status_code == 200:
+                candidates = r.json().get('candidates', [])
+                # Posortuj po score
+                candidates.sort(key=lambda x: -x.get('score', 0))
+                selected = candidates[0]['phrase'] if candidates else ''
+                secondary = [c['phrase'] for c in candidates[1:4]]  # top 3 poboczne
+                log.info(f'Frazy SEO: {selected} + {secondary}')
+                return selected, secondary
+        except Exception as e:
+            log.warning(f'phrase-candidates error: {e}')
+        return '', []
 
     def write_to_sheets(self, candidates: list, spreadsheet_id: str = None) -> bool:
         """Zapisuje kandydatów do Google Sheets."""
@@ -360,11 +402,31 @@ class Kurier365Worker(WorkerBase):
 
     def generate_article(self, candidate: ContentCandidate, target_portal: str) -> Optional[dict]:
         """Wywołaj POST /api/editor/generate w PressAI."""
+        portal_urls = {
+            'Kurier365': 'https://kurier365.pl',
+            'BiznesCiti': 'https://biznesciti.com',
+            'Prawy.pl': 'https://prawy.pl'
+        }
+        portal_name = _get_target_portal(candidate)
+        site_url = portal_urls.get(portal_name, 'https://kurier365.pl')
+
+        selected_phrase, secondary_phrases = self._get_seo_phrases(
+            source_text=candidate.title + ' ' + (candidate.summary or ''),
+            source_url=candidate.content_url or '',
+            portal_name=portal_name,
+            portal_url=site_url
+        )
+
         url = f"{self.pressai_url}/api/editor/generate"
-        payload = build_generate_payload(candidate, target_portal)
+        payload = build_generate_payload(
+            candidate,
+            target_portal,
+            selected_phrase=selected_phrase,
+            secondary_phrases=secondary_phrases
+        )
         headers = self._get_auth_headers()
 
-        log.info(f"Wysyłam zapytanie o generowanie artykułu do {url} dla portalu {target_portal}")
+        log.info(f"Wysyłam zapytanie o generowanie artykułu do {url} dla portalu {target_portal} (fraza: '{selected_phrase}')")
         try:
             resp = requests.post(url, json=payload, headers=headers, timeout=180)
             if resp.status_code in (200, 201):
@@ -506,6 +568,7 @@ Zmienne środowiskowe:
   FEED_CRAWLER_URL            — URL API Feed Crawler (domyślnie: https://crawler.impresjapr.pl)
   PRESSAI_URL                 — URL API PressAI (domyślnie: https://press.impresjapr.pl)
   PRESSAI_JWT                 — JWT token PressAI
+  PRESSAI_JWT_USER            — JWT token użytkownika PressAI (tobroz@gmail.com)
   NEWSERIA_USER               — login Newseria
   NEWSERIA_PASS               — hasło Newseria
   CONTENT_RADAR_JWT           — JWT token Content Radar (radar.impresjapr.pl)
