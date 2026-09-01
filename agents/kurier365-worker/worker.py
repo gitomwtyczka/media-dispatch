@@ -11,6 +11,7 @@ Architektura rozszerzalna (plugin-based):
     - Newseria (gospodarka, konsument, prawo)
   Trend Signals:
     - GeoRelevanceSignal (waga PL/EU/Global vs Low relevance) — LIVE
+    - RadarEnricher (Content Radar viral_score boost per-portal) — LIVE
     - ContentRadarSignal (radar.impresjapr.pl — LIVE)
     - GoogleTrendsSignal (fallback placeholder)
     - SocialTrendsSignal (fallback placeholder)
@@ -27,6 +28,7 @@ Status wdrożenia:
   GmailSource v1.0 — LIVE (PressAI Gmail API, tobroz@gmail.com).
   FeedCrawlerSource v1.2 — LIVE (13k+ feedów, crawler.impresjapr.pl, działy tematyczne).
   GeoRelevanceSignal v1.0 — LIVE (priorytetyzacja PL/EU/US-biznes).
+  RadarEnricher v1.0 — LIVE (Content Radar per-portal viral_score boost).
   Content Radar LIVE — aktywny gdy CONTENT_RADAR_JWT ustawiony.
   Discord notifications — aktywne gdy DISCORD_WEBHOOK_KURIER365 ustawiony.
   Google Sheets — aktywny gdy GOOGLE_SA_FILE ustawiony.
@@ -50,6 +52,7 @@ from agents.base.sources.gmail_source import GmailSource
 from agents.base.sources.feed_crawler_source import FeedCrawlerSource
 from agents.base.sources.newseria_source import NewseriaSource
 from agents.base.trend_signals.geo_relevance_signal import GeoRelevanceSignal
+from agents.base.trend_signals.radar_enricher import RadarEnricher
 from agents.base.trend_signals.content_radar_signal import ContentRadarSignal
 from agents.base.trend_signals.google_trends_signal import GoogleTrendsSignal, SocialTrendsSignal
 
@@ -271,8 +274,9 @@ class Kurier365Worker(WorkerBase):
     Pipeline:
         1. collect_candidates() — zbiera z Gmail + FeedCrawler + Newseria
         2. enrich_with_trends() — ocenia trend_score i geo_relevance
-        3. Kandydaci sortowani (priority DESC, trend_score DESC)
-        4. process(candidate) — generuje artykuł w PressAI, zapisuje do historii,
+        3. radar.enrich() — wzbogaca o viral_score z Content Radar
+        4. Kandydaci sortowani (priority DESC, trend_score DESC)
+        5. process(candidate) — generuje artykuł w PressAI, zapisuje do historii,
            aktualizuje Sheets ('w produkcji') i publikuje WP draft dla wyjątków.
     """
 
@@ -345,6 +349,7 @@ class Kurier365Worker(WorkerBase):
 
         # GeoRelevanceSignal — waży relevancję PL/EU/US-biznes vs low relevance
         self.add_trend_signal(GeoRelevanceSignal())
+        self.radar = RadarEnricher(portal='kurier365')
 
         # Content Radar — LIVE integracja z radar.impresjapr.pl
         self.add_trend_signal(ContentRadarSignal(
@@ -355,6 +360,11 @@ class Kurier365Worker(WorkerBase):
         # GoogleTrends + Social — fallback placeholder
         self.add_trend_signal(GoogleTrendsSignal())
         self.add_trend_signal(SocialTrendsSignal())
+
+    def run(self) -> List[ContentCandidate]:
+        candidates = super().run()
+        candidates = self.radar.enrich(candidates)
+        return candidates
 
     def _get_auth_headers(self) -> dict:
         token = self.pressai_token or os.environ.get('PRESSAI_JWT_USER') or os.environ.get('PRESSAI_JWT') or os.environ.get('PRESSAI_TOKEN')
