@@ -2,7 +2,7 @@
 GmailSource v1.0 — Gmail source via PressAI API
 Monitoruje skrzynkę tobroz@gmail.com przez PressAI backend (https://press.impresjapr.pl/api/gmail).
 Priorytetowi nadawcy: WEI, Cezary Rudiński, Arkadiusz Bińczyk, Biały Kruk, Juchniewicz, Bolek, Zabka, Maxmedia, Gryżewski, Kalinowska, Art-Media, Fundacja XBW.
-media-dispatch | media-dev-31 | 01.09.2026
+media-dispatch | media-dev-39 | 01.09.2026
 """
 import hashlib
 import json
@@ -10,11 +10,11 @@ import logging
 import os
 from datetime import datetime, timezone
 from typing import List, Optional, Union
-import urllib.request
-import urllib.parse
-import urllib.error
+import requests
 
 from agents.base.worker_base import SourcePlugin, ContentCandidate
+
+logger = logging.getLogger("GmailSource")
 
 
 class GmailSource(SourcePlugin):
@@ -70,7 +70,7 @@ class GmailSource(SourcePlugin):
         Args:
             pressai_url:      Base URL serwisu PressAI (np. 'https://press.impresjapr.pl')
             portal:           docelowy portal (np. 'kurier365' lub 'kurier365.pl')
-            token:            JWT token PressAI (jeśli None, czyta z env PRESSAI_JWT / PRESSAI_TOKEN)
+            token:            JWT token PressAI (jeśli None, czyta z env PRESSAI_JWT_USER / PRESSAI_JWT)
             hours_back:       ile godzin wstecz sprawdzać maile (domyślnie 24)
             state_file:       ścieżka do pliku JSON ze stanem przetworzonych ID
             account_id:       ID konta Gmail w bazie PressAI (jeśli None, automatycznie wykrywane)
@@ -92,7 +92,7 @@ class GmailSource(SourcePlugin):
 
     def _get_token(self) -> Optional[str]:
         """Pobierz token JWT z konfiguracji lub zmiennych środowiskowych."""
-        return self.token or os.environ.get('PRESSAI_JWT') or os.environ.get('PRESSAI_TOKEN')
+        return self.token or os.environ.get('PRESSAI_JWT_USER') or os.environ.get('PRESSAI_JWT') or os.environ.get('PRESSAI_TOKEN')
 
     def _load_seen(self) -> set:
         """Wczytaj identyfikatory już przetworzonych wiadomości."""
@@ -147,160 +147,152 @@ class GmailSource(SourcePlugin):
                 return info
         return None
 
-    def _resolve_account_id(self, token: str) -> Optional[int]:
-        """Automatycznie znajdź account_id dla danego adresu w PressAI."""
-        if self.account_id:
-            return self.account_id
-
-        url = f"{self.pressai_url}/api/gmail/accounts"
-        headers = {
-            'Authorization': f'Bearer {token}',
-            'Accept': 'application/json',
-            'User-Agent': 'media-dispatch/GmailSource-1.0'
-        }
-        try:
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                if resp.status == 200:
-                    data = json.loads(resp.read().decode('utf-8'))
-                    accounts = data.get('accounts', [])
-                    for acc in accounts:
-                        if self.account_email and self.account_email.lower() in acc.get('email', '').lower():
-                            self.account_id = acc.get('id')
-                            self.logger.info(f"Wykryto Gmail account_id={self.account_id} dla {acc.get('email')}")
-                            return self.account_id
-                    if accounts:
-                        self.account_id = accounts[0].get('id')
-                        self.logger.info(f"Użyto domyślnego Gmail account_id={self.account_id} ({accounts[0].get('email')})")
-                        return self.account_id
-        except Exception as e:
-            self.logger.error(f"Błąd podczas pobierania kont Gmail z PressAI: {e}")
-
-        return None
-
     def fetch(self) -> List[ContentCandidate]:
         """Pobierz nowe maile przez PressAI Gmail API."""
+        candidates = []
         token = self._get_token()
         if not token:
-            self.logger.warning("GmailSource: brak tokenu PRESSAI_JWT — pomijam pobieranie maili")
+            logger.warning('GmailSource: brak PRESSAI_JWT_USER')
             return []
 
-        account_id = self._resolve_account_id(token)
-        if not account_id:
-            self.logger.warning(f"GmailSource: brak aktywnego konta Gmail ({self.account_email}) w PressAI")
-            return []
+        headers = {'Authorization': f'Bearer {token}'}
+        pressai_url = self.pressai_url
 
-        days = max(1, (self.hours_back + 23) // 24)
-        query = f"in:inbox newer_than:{days}d"
-        params = urllib.parse.urlencode({
-            'account_id': account_id,
-            'q': query,
-            'max_results': self.max_results
-        })
-        url = f"{self.pressai_url}/api/gmail/messages?{params}"
-        headers = {
-            'Authorization': f'Bearer {token}',
-            'Accept': 'application/json',
-            'User-Agent': 'media-dispatch/GmailSource-1.0'
-        }
-
-        raw_messages = []
+        # Pobierz account_id dla tobroz@gmail.com
         try:
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                if resp.status == 200:
-                    data = json.loads(resp.read().decode('utf-8'))
-                    raw_messages = data.get('messages', [])
-        except urllib.error.HTTPError as he:
-            if he.code == 401:
-                self.logger.error("GmailSource: PressAI 401 Unauthorized — token nieprawidłowy lub wymagana reautoryzacja Gmail")
-            else:
-                self.logger.error(f"GmailSource HTTP Error {he.code}: {he.reason}")
-            return []
+            r = requests.get(f'{pressai_url}/api/gmail/accounts', headers=headers, timeout=10)
+            if r.status_code != 200:
+                logger.warning(f'GmailSource: accounts {r.status_code}')
+                return []
+            accounts = r.json().get('accounts', [])
+            if not accounts:
+                logger.warning('GmailSource: brak kont Gmail')
+                return []
+            account_id = self.account_id or accounts[0]['id']
         except Exception as e:
-            self.logger.error(f"GmailSource: błąd pobierania wiadomości: {e}")
+            logger.error(f'GmailSource accounts error: {e}')
             return []
 
-        candidates = []
-        for msg in raw_messages:
-            from_addr = msg.get('from', '')
-            sender_info = self._detect_sender(from_addr)
+        # Pobierz wiadomosci z ostatnich hours_back godzin
+        days = max(1, self.hours_back // 24)
+        try:
+            r2 = requests.get(
+                f'{pressai_url}/api/gmail/messages',
+                headers=headers,
+                params={'account_id': account_id, 'q': f'newer_than:{days}d', 'max_results': self.max_results},
+                timeout=15
+            )
+            if r2.status_code != 200:
+                logger.warning(f'GmailSource: messages {r2.status_code} - {r2.text[:100]}')
+                return []
+            messages = r2.json().get('messages', [])
+        except Exception as e:
+            logger.error(f'GmailSource messages error: {e}')
+            return []
+
+        for msg in messages:
+            sender = msg.get('from', '').lower()
+            msg_id = msg.get('id', '')
+
+            # Filtruj po priorytetowych nadawcach
+            sender_info = self._detect_sender(sender)
             if not sender_info:
                 continue
 
-            msg_id = str(msg.get('id', ''))
-            if not msg_id or msg_id in self._seen:
+            # Deduplikacja
+            eid = hashlib.md5(msg_id.encode()).hexdigest()
+            if eid in self._seen:
                 continue
+            self._seen.add(eid)
 
-            self._seen.add(msg_id)
-            candidate = self._message_to_candidate(msg, sender_info)
+            # Dla P0 (priority >= 9): wywolaj prepare-article aby wyciagnac obrazki + tresc
+            prepared_data = {}
+            if sender_info.get('priority', 0) >= 9:
+                try:
+                    rp = requests.post(
+                        f'{pressai_url}/api/gmail/prepare-article',
+                        params={'message_id': msg_id, 'account_id': account_id},
+                        headers=headers,
+                        timeout=30
+                    )
+                    if rp.status_code == 200:
+                        prepared_data = rp.json()
+                        logger.info(f'GmailSource prepare-article OK dla {sender[:30]}')
+                except Exception as e:
+                    logger.warning(f'GmailSource prepare-article error: {e}')
+
+            candidate = self._message_to_candidate(msg, sender_info, prepared_data)
             candidates.append(candidate)
 
         self._save_seen()
-        self.logger.info(f"GmailSource: pobrano {len(raw_messages)} wiadomości, znaleziono {len(candidates)} nowych kandydatów.")
+        logger.info(f'GmailSource: {len(candidates)} nowych kandydatow')
         return candidates
 
-    def _message_to_candidate(self, msg: dict, sender_info: dict) -> ContentCandidate:
-        """Konwertuje wiadomość Gmail na obiekt ContentCandidate."""
-        msg_id = str(msg.get('id', msg.get('message_id', hash(msg.get('subject', '')))))
-        eid = hashlib.md5(msg_id.encode('utf-8')).hexdigest()
+    def _message_to_candidate(self, msg: dict, sender_info: dict, prepared: dict = None) -> ContentCandidate:
+        """Buduje ContentCandidate z maila + opcjonalnych danych prepare-article."""
+        msg_id = msg.get('id', '')
+        eid = hashlib.md5(msg_id.encode()).hexdigest()
 
-        portal_target = sender_info.get('portal', self.portal)
-        if portal_target == 'kurier365':
-            portal_target = 'kurier365.pl'
-
-        subject = msg.get('subject') or '(brak tematu)'
-        snippet = msg.get('snippet') or msg.get('body') or ''
+        # Tresc: z prepare-article jesli dostepna, inaczej snippet
+        source_text = ''
+        images = []
+        if prepared:
+            source_text = prepared.get('source_text', '')
+            images = prepared.get('images', [])
+        if not source_text:
+            source_text = msg.get('snippet', '')
 
         return ContentCandidate(
             id=eid,
             source=f"gmail:{sender_info['name']}",
-            portal=portal_target,
-            title=subject,
-            summary=snippet[:500],
+            portal=sender_info.get('portal', self.portal),
+            title=msg.get('subject', '(brak tematu)'),
+            summary=source_text[:500],
             content_url=f"https://mail.google.com/mail/u/0/#inbox/{msg_id}",
-            raw_content=msg.get('body') or snippet,
             metadata={
                 'sender': msg.get('from', ''),
                 'received_at': msg.get('date', ''),
                 'message_id': msg_id,
-                'pressai_prepared': False,
+                'account_id': msg.get('account_id', ''),
+                'pressai_prepared': bool(prepared),
+                'images': images,  # obrazki wyciagniete przez PressAI
                 'section': 'Współpracownicy',
-                'has_attachments': msg.get('has_attachments', False),
-                'labels': msg.get('labels', []),
-                'account_id': self.account_id,
-                'author': sender_info['name'],
-                'requires_review': sender_info.get('requires_review', True)
+                'auto_draft': sender_info.get('priority', 0) >= 9  # auto WP draft dla P0
             },
-            priority=sender_info.get('priority', 8)
+            priority=sender_info['priority']
         )
 
     def prepare_article(self, message_id: str) -> Optional[dict]:
         """Wywołaj endpoint POST /api/gmail/prepare-article w PressAI."""
         token = self._get_token()
         if not token:
-            self.logger.error("GmailSource: brak tokenu PRESSAI_JWT")
+            self.logger.error("GmailSource: brak tokenu PRESSAI_JWT_USER / PRESSAI_JWT")
             return None
 
-        account_id = self._resolve_account_id(token)
+        headers = {'Authorization': f'Bearer {token}'}
+        account_id = self.account_id
+        if not account_id:
+            try:
+                r = requests.get(f'{self.pressai_url}/api/gmail/accounts', headers=headers, timeout=10)
+                if r.status_code == 200:
+                    accounts = r.json().get('accounts', [])
+                    if accounts:
+                        account_id = accounts[0]['id']
+            except Exception as e:
+                self.logger.error(f"GmailSource accounts lookup error: {e}")
+
         if not account_id:
             return None
 
-        params = urllib.parse.urlencode({
-            'message_id': message_id,
-            'account_id': account_id
-        })
-        url = f"{self.pressai_url}/api/gmail/prepare-article?{params}"
-        headers = {
-            'Authorization': f'Bearer {token}',
-            'Accept': 'application/json',
-            'User-Agent': 'media-dispatch/GmailSource-1.0'
-        }
         try:
-            req = urllib.request.Request(url, data=b'', headers=headers, method='POST')
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                if resp.status == 200:
-                    return json.loads(resp.read().decode('utf-8'))
+            rp = requests.post(
+                f'{self.pressai_url}/api/gmail/prepare-article',
+                params={'message_id': message_id, 'account_id': account_id},
+                headers=headers,
+                timeout=60
+            )
+            if rp.status_code == 200:
+                return rp.json()
         except Exception as e:
             self.logger.error(f"GmailSource prepare_article error dla {message_id}: {e}")
 
@@ -312,14 +304,7 @@ class GmailSource(SourcePlugin):
         if not token:
             return False
         try:
-            url = f"{self.pressai_url}/api/gmail/accounts"
-            headers = {
-                'Authorization': f'Bearer {token}',
-                'Accept': 'application/json',
-                'User-Agent': 'media-dispatch/GmailSource-1.0'
-            }
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                return resp.status == 200
+            r = requests.get(f"{self.pressai_url}/api/gmail/accounts", headers={'Authorization': f'Bearer {token}'}, timeout=10)
+            return r.status_code == 200
         except Exception:
             return False
