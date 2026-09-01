@@ -68,7 +68,7 @@ Zaimplementowano rozszerzalną architekturę Plugin-based Workers:
 - **`gmail-kurier365-worker`** — aktywacja GmailSource (token PressAI + PressAI Gmail API)
 - **`feed-crawler-worker`** — implementacja RSSSource (feedparser lub feed-crawler serwis)
 - **`newseria-connector`** — implementacja scraping sesyjny Newseria
-- **`redaktor-naczelny-bot` (Telegram)** — implementacja process() z inline buttons
+- **`redaktor-naczelny-discord`** — FastAPI Interactions endpoint (`/api/v1/discord/interactions`) + Discord Webhooks + Embeds z przyciskami (Action Row: Akceptuj, Odrzuć, Odrocz D+1, Odrocz D+7, Uwagi przez Modal)
 - **`biznesciti-worker`** — nowa instancja WorkerBase dla biznesciti.com
 - **`pressai-worker`** — rozszerzenie o playbooki per portal
 
@@ -90,7 +90,7 @@ Zaimplementowano rozszerzalną architekturę Plugin-based Workers:
 ### FAZA 5: Multi-platform Distribution
 - YouTube worker: upload + scheduling
 - TikTok worker: shorty z VSE
-- Telegram worker: bot API
+- Telegram worker: bot API (dystrybucja kanałowa)
 
 ### FAZA 5b: TikTok Upload (Gotowe Shorty _gotowy.mp4)
 - Integracja `tiktok-worker` z lokalną bazą wideo `C:\VSE\Shorts\`
@@ -125,6 +125,6 @@ Kazdy worker musi implementowac:
 3. pressAI worker - kluczowy dla skali
 4. **kurier365-worker skeleton v0.1** - architektura gotowa (31.08.2026), aktywacja źrodet: Faza 2
 5. Content Radar (radar.impresjapr.pl) - LIVE na produkcji (31.08.2026)
-6. redaktor-naczelny-bot (Telegram) - orkiestracja i Human-in-the-Loop
+6. redaktor-naczelny-discord (Discord Editorial Center) - FastAPI Interactions + Webhooks + Action Row przyciski i modale
 7. newseria-connector + biznesciti-worker
 8. TikTok distribution - po walidacji flow _gotowy.mp4
