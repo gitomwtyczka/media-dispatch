@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""agents/kurier365-worker/worker.py
+\"\"\"agents/kurier365-worker/worker.py
 
 Kurier365Worker — instancja WorkerBase dla kurier365.pl
-media-dispatch | media-dev-28 | 01.09.2026
+media-dispatch | media-dev-29 | 01.09.2026
 
 Architektura rozszerzalna (plugin-based):
   Sources:
@@ -28,7 +28,7 @@ Status wdrożenia:
   Content Radar LIVE — aktywny gdy CONTENT_RADAR_JWT ustawiony.
   Discord notifications — aktywne gdy DISCORD_WEBHOOK_KURIER365 ustawiony.
   Google Sheets — aktywny gdy GOOGLE_SA_FILE ustawiony.
-"""
+\"\"\"
 import argparse
 import json
 import logging
@@ -55,7 +55,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[
+    handlers==[
         logging.StreamHandler(sys.stdout),
         logging.FileHandler(
             Path(__file__).parent / 'worker.log',
@@ -94,19 +94,19 @@ CONFIG = {
 # ---------------------------------------------------------------------------
 
 def write_candidates_to_sheets(candidates: list, spreadsheet_id: str = '1HMuODAIOG8e_9VH-HitdL_TwBRwgFZ0vnSKAW7Wmyig') -> bool:
-    """Zapisuje kandydatów do zakładki Kandydaci w Google Sheets."""
+    \"\"\"Zapisuje kandydatów do zakładki Kandydaci w Google Sheets.\"\"\"
     import os
     from datetime import datetime
     try:
         from google.oauth2.service_account import Credentials
         import gspread
     except ImportError:
-        log.warning("Brak bibliotek google-auth / gspread — pomijam zapis do Sheets")
+        log.warning(\"Brak bibliotek google-auth / gspread — pomijam zapis do Sheets\")
         return False
 
     sa_file = os.getenv('GOOGLE_SA_FILE', '/home/ubuntu/otwock-data/muzeum/muzeum-drive-sa.json')
     if not os.path.exists(sa_file):
-        log.warning(f"Brak pliku service account ({sa_file}) — pomijam zapis do Sheets")
+        log.warning(f\"Brak pliku service account ({sa_file}) — pomijam zapis do Sheets\")
         return False
 
     try:
@@ -152,7 +152,7 @@ def write_candidates_to_sheets(candidates: list, spreadsheet_id: str = '1HMuODAI
 
 
 class Kurier365Worker(WorkerBase):
-    """Orkiestrator contentu dla kurier365.pl.
+    \"\"\"Orkiestrator contentu dla kurier365.pl.
 
     Pipeline:
         1. collect_candidates() — zbiera z Gmail + FeedCrawler + Newseria
@@ -167,13 +167,13 @@ class Kurier365Worker(WorkerBase):
     Dodawanie nowego sygnału trendów:
         from agents.base.trend_signals.moj_signal import MojSignal
         self.add_trend_signal(MojSignal(api_url=...))
-    """
+    \"\"\"
 
     def __init__(self, config: dict = None):
-        """
+        \"\"\"
         Args:
             config: nadpisz domyślną konfigurację CONFIG (opcjonalne).
-        """
+        \"\"\"
         effective_config = {**CONFIG, **(config or {})}
         super().__init__(effective_config)
 
@@ -260,11 +260,11 @@ class Kurier365Worker(WorkerBase):
         self.add_trend_signal(SocialTrendsSignal())
 
     def write_to_sheets(self, candidates: list, spreadsheet_id: str = '1HMuODAIOG8e_9VH-HitdL_TwBRwgFZ0vnSKAW7Wmyig') -> bool:
-        """Zapisuje kandydatów do Google Sheets."""
+        \"\"\"Zapisuje kandydatów do Google Sheets.\"\"\"
         return write_candidates_to_sheets(candidates, spreadsheet_id=spreadsheet_id)
 
     def process(self, candidate: ContentCandidate) -> dict:
-        """Wyślij kandydata do Redaktora Naczelnego (Telegram bot).
+        \"\"\"Wyślij kandydata do Redaktora Naczelnego (Telegram bot).
 
         TODO: Faza 2 — integracja z redaktor-naczelny-bot:
             POST {telegram_bot_url}/api/candidate
@@ -276,8 +276,8 @@ class Kurier365Worker(WorkerBase):
 
         Returns:
             Dict z wynikiem: {'status': str, 'candidate_id': str}
-        """
-        log.info("process() placeholder: candidate %s '%s'", candidate.id, candidate.title[:50])
+        \"\"\"
+        log.info(\"process() placeholder: candidate %s '%s'\", candidate.id, candidate.title[:50])
         return {'status': 'placeholder_sent_to_editor', 'candidate_id': candidate.id}
 
 
@@ -289,8 +289,7 @@ def main():
     parser = argparse.ArgumentParser(
         description='kurier365-worker — Content pipeline dla kurier365.pl',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Przykłady:
+        epilog=\"\"\"\nPrzykłady:
   python worker.py --health
   python worker.py --run
   python worker.py --run --top 5
@@ -304,8 +303,9 @@ Zmienne środowiskowe:
   NEWSERIA_PASS               — hasło Newseria
   CONTENT_RADAR_JWT           — JWT token Content Radar (radar.impresjapr.pl)
   DISCORD_WEBHOOK_KURIER365   — Webhook URL Discord dla powiadomień
+  DISCORD_WEBHOOK_PRIORITY    — Webhook URL Discord dla powiadomień priorytetowych (P0/Gmail)
   GOOGLE_SA_FILE              — Ścieżka do klucza Service Account Google
-"""
+\"\"\"
     )
     parser.add_argument('--health', action='store_true', help='Status komponentów workera')
     parser.add_argument('--run', action='store_true', help='Zbierz kandydatów ze źródeł')
@@ -321,31 +321,33 @@ Zmienne środowiskowe:
         if args.json:
             print(json.dumps(status, indent=2, ensure_ascii=False))
         else:
-            print(f"Worker: {status['worker']}")
-            print(f"State file: {status['state_file']}")
-            print("Sources:")
+            print(f\"Worker: {status['worker']}\")
+            print(f\"State file: {status['state_file']}\")
+            print(\"Sources:\")
             for s in status['sources']:
                 icon = '✅' if s['healthy'] else '❌ (placeholder)'
-                print(f"  {icon} {s['name']}")
+                print(f\"  {icon} {s['name']}\")
             signals = status['trend_signals']
-            print(f"Trend signals: {', '.join(signals) if signals else 'none'}")
+            print(f\"Trend signals: {', '.join(signals) if signals else 'none'}\")
             cr_jwt = os.environ.get('CONTENT_RADAR_JWT')
-            print(f"Content Radar JWT: {'SET (✅ LIVE)' if cr_jwt else 'NOT SET (⚠️ trends disabled)'}")
+            print(f\"Content Radar JWT: {'SET (✅ LIVE)' if cr_jwt else 'NOT SET (⚠️ trends disabled)'}\")
             discord_url = os.environ.get('DISCORD_WEBHOOK_KURIER365')
-            print(f"Discord Webhook: {'SET (✅ LIVE)' if discord_url else 'NOT SET (⚠️ discord disabled)'}")
+            print(f\"Discord Webhook: {'SET (✅ LIVE)' if discord_url else 'NOT SET (⚠️ discord disabled)'}\")
+            priority_url = os.environ.get('DISCORD_WEBHOOK_PRIORITY')
+            print(f\"Discord Priority Webhook: {'SET (✅ LIVE)' if priority_url else 'NOT SET'}\")
             sa_file = os.environ.get('GOOGLE_SA_FILE', '/home/ubuntu/otwock-data/muzeum/muzeum-drive-sa.json')
             sa_ok = os.path.exists(sa_file)
-            print(f"Google SA File: {'SET (✅ FOUND)' if sa_ok else f'NOT FOUND ({sa_file})'}")
+            print(f\"Google SA File: {'SET (✅ FOUND)' if sa_ok else f'NOT FOUND ({sa_file})'}\")
         return
 
     if args.run:
         candidates = worker.run()
         top = candidates[:args.top]
 
-        # Discord notify dla top kandydatów (priority >= 6)
+        # Discord notify dla top kandydatów (priority >= 6 lub Gmail)
         discord_sent = 0
         for c in top:
-            if c.priority >= 6:
+            if c.priority >= 6 or c.source.startswith('gmail:'):
                 if worker.notify_discord(c):
                     discord_sent += 1
 
@@ -356,15 +358,15 @@ Zmienne środowiskowe:
         if args.json:
             print(json.dumps([c.to_dict() for c in top], indent=2, ensure_ascii=False))
         else:
-            print(f"\nZnaleziono {len(candidates)} kandydatów. Top-{len(top)}:\n")
+            print(f\"\\nZnaleziono {len(candidates)} kandydatów. Top-{len(top)}:\\n\")
             for c in top:
-                trend = f" trend={c.trend_score:.2f}" if c.trend_score > 0 else ""
-                geo = f" [{c.metadata.get('geo_relevance', '')}]" if 'geo_relevance' in c.metadata else ""
-                print(f"  [{c.priority:2d}] [{c.source:20s}]{trend}{geo} {c.title[:70]}")
+                trend = f\" trend={c.trend_score:.2f}\" if c.trend_score > 0 else \"\"
+                geo = f\" [{c.metadata.get('geo_relevance', '')}]\" if 'geo_relevance' in c.metadata else \"\"
+                print(f\"  [{c.priority:2d}] [{c.source:20s}]{trend}{geo} {c.title[:70]}\")
             if len(candidates) > args.top:
-                print(f"  ... i {len(candidates) - args.top} więcej")
+                print(f\"  ... i {len(candidates) - args.top} więcej\")
             if discord_sent > 0:
-                print(f"\nWysłano {discord_sent} powiadomień do Discord.")
+                print(f\"\\nWysłano {discord_sent} powiadomień do Discord.\")
         return
 
     parser.print_help()
