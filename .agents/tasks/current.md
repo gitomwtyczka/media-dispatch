@@ -4,10 +4,12 @@
 - Naprawiono halucynacje z VSE API poprzez wpompowanie tekstów bezpośrednio ze zweryfikowanych Short Candidates
 - Collaborate Link (Draft) fix URL resolving in WP snippet
 - Przygotowano skrypt `fix_all.py` do aktualizacji 5 shortów z 30 sierpnia oraz automatycznej aktualizacji Arkusza Google.
+- Wykonano pełny run feed-crawler + content-radar, znaleziono 8 kandydatów na artykuły.
+- Wygenerowano 8 artykułów przez system PressAI (Kurier365 / BiznesCiti).
 
-## 🟡 W toku (Handoff)
-- Skrypt `fix_all.py` czeka na ostateczne kliknięcie "Proceed" / autoryzację przez użytkownika rano, by wykonać pełen cykl dla 5 starych shortów.
-- Po wykonaniu skryptu należy sprawdzić / przypiąć ręcznie "Podobny film" na YT.
+## 🟡 W toku
+- Artykuły z dzisiejszego przeglądu wywiadowczego trafiły do historii PressAI. Oczekują na dodanie zdjęć i ręczną publikację.
+- 5 starszych shortów z 30 sierpnia: skrypt wyczyścił "Wolińską", 2 przywrócono w 100%, 3 wymagają manualnego wpisania opisów.
 
 ## 🔵 Następne
 1. YouTube SEO historyczny update (yt-seo-backlog)
