@@ -412,6 +412,29 @@ class Kurier365Worker(WorkerBase):
         target_sid = spreadsheet_id or self.spreadsheet_id
         return write_candidates_to_sheets(candidates, spreadsheet_id=target_sid)
 
+    def _extract_source_text(self, candidate: ContentCandidate) -> str:
+        """Pobiera natywny, pełny content z PressAI API (extractor.py) by uzyskać dosłowne wypowiedzi dla cytatów."""
+        url = candidate.content_url
+        if not url:
+            return candidate.raw_content or candidate.summary or candidate.title
+
+        api_url = f"{self.pressai_url}/api/editor/extract"
+        headers = self._get_auth_headers()
+        try:
+            log.info(f"Pobieranie natywnej treści z {api_url} dla {url}")
+            resp = requests.post(api_url, json={'url': url}, headers=headers, timeout=30)
+            if resp.status_code == 200:
+                data = resp.json()
+                extracted_text = data.get('text', '')
+                if extracted_text and len(extracted_text) > 200:
+                    log.info(f"Natywny scraper PressAI zwrócił {len(extracted_text)} znaków (będą pełne cytaty!).")
+                    return extracted_text
+        except Exception as e:
+            log.warning(f"Błąd podczas /api/editor/extract: {e}")
+            
+        log.warning("Natywny scraper zawiódł, używam fallbacku do tekstu z bazy/kandydata.")
+        return candidate.raw_content or candidate.summary or candidate.title
+
     def generate_article(self, candidate: ContentCandidate, target_portal: str) -> Optional[dict]:
         """Wywołaj POST /api/editor/generate w PressAI."""
         portal_urls = {
@@ -422,8 +445,11 @@ class Kurier365Worker(WorkerBase):
         portal_name = _get_target_portal(candidate)
         site_url = portal_urls.get(portal_name, 'https://kurier365.pl')
 
+        # Wyciągamy NATYWNY tekst używając PressAI (żeby mieć dosłowne cytaty!)
+        rich_source_text = self._extract_source_text(candidate)
+
         selected_phrase, secondary_phrases = self._get_seo_phrases(
-            source_text=candidate.title + ' ' + (candidate.summary or ''),
+            source_text=rich_source_text[:2000], # Używamy wzbogaconego tekstu
             source_url=candidate.content_url or '',
             portal_name=portal_name,
             portal_url=site_url
@@ -436,6 +462,9 @@ class Kurier365Worker(WorkerBase):
             selected_phrase=selected_phrase,
             secondary_phrases=secondary_phrases
         )
+        # Nadpisujemy źródłowy tekst "golec" z kandydata tym co wyciągnął PressAI (będą cytaty!)
+        payload['source_text'] = rich_source_text
+        
         headers = self._get_auth_headers()
 
         log.info(f"Wysyłam zapytanie o generowanie artykułu do {url} dla portalu {target_portal} (fraza: '{selected_phrase}')")
