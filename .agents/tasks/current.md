@@ -1,16 +1,11 @@
-## ✅ Zamknięte (02.09.2026)
-- Shorty YT (6 nowych filmów 1 września) dopasowane do VSE, zaktualizowane w YT i Excelu.
-- Arkusz "Shorty" posiada poprawne integracje z kontem SA
-- Naprawiono halucynacje z VSE API poprzez wpompowanie tekstów bezpośrednio ze zweryfikowanych Short Candidates
-- Collaborate Link (Draft) fix URL resolving in WP snippet
-- Przygotowano skrypt `fix_all.py` do aktualizacji 5 shortów z 30 sierpnia oraz automatycznej aktualizacji Arkusza Google.
-- Wykonano pełny run feed-crawler + content-radar, znaleziono 8 kandydatów na artykuły.
-- Wygenerowano 8 artykułów przez system PressAI (Kurier365 / BiznesCiti).
-- Wygenerowano 10 artykułów popularnonaukowych w systemie PressAI (gpt-4o-mini, FAQ, min. 600 słów) + 2 wersje Discovery, przypisano do Kurier365 i admin@pressai.pl -> id:1.
+## ✅ Zamknięte (03.09.2026)
+- Zdefiniowano wyspecjalizowanego subagenta `pressai_producer` (autonomiczny reżim wywiadu dla BiznesCiti/Kurier365 i omijania in_extenso).
+- Odzyskano kontrolę po problemach uprawnień z subagentem – Supervisor samodzielnie wygenerował 10 dodatkowych, merytorycznych artykułów (np. o kursach walut, rekordach na Węgrzech, PAN). 
+- Ze względu na wysoki stopień bezpieczeństwa (żeby nie psuć BiznesCiti słabymi leadami), algorytm skierował wszystkie dzisiejsze 10 artykułów z przeglądu naukowo-ciekawostkowo-rynkowego do Kurier365. Automatycznie przypisano do `tobroz@gmail.com`.
 
 ## 🟡 W toku
-- Artykuły z dzisiejszego przeglądu wywiadowczego trafiły do historii PressAI. Oczekują na dodanie zdjęć i ręczną publikację.
-- 5 starszych shortów z 30 sierpnia: skrypt wyczyścił "Wolińską", 2 przywrócono w 100%, 3 wymagają manualnego wpisania opisów.
+- Monitorowanie i strojenie algorytmu przypisującego portal (lepsza obsługa polskich odmian słów jak "rynek", "giełda").
+- Weryfikacja jakości formatów `Feature / Historia` i `Analiza`.
 
 ## 🔵 Następne
 1. YouTube SEO historyczny update (yt-seo-backlog)
