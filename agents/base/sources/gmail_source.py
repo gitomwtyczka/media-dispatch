@@ -27,34 +27,32 @@ class GmailSource(SourcePlugin):
     # Dodawaj fragm. domeny (@art-media.pl) lub imienia/nazwiska (rudzinski)
     # TODO: Uzupełnić o dokładne adresy email współpracowników gdy znane
     PRIORITY_SENDERS = {
-        # === JUŻ ISTNIEJĄCE ===
+        # === DOMENY KORPORACYJNE I ZASTOSOWANIA OGÓLNE ===
         'wei.org.pl': {'name': 'WEI', 'priority': 9, 'portal': 'kurier365'},
         'bialykruk.pl': {'name': 'Biały Kruk', 'priority': 8, 'portal': 'kurier365'},
-        'rudinski': {'name': 'Cezary Rudiński', 'priority': 9, 'portal': 'kurier365'},
-        'rudzinski': {'name': 'Cezary Rudiński', 'priority': 9, 'portal': 'kurier365'},
-        'pluzanski': {'name': 'T. Płużański', 'priority': 9, 'portal': 'kurier365'},
-        't_pluzanski': {'name': 'T. Płużański', 'priority': 9, 'portal': 'kurier365'},
-        'tomasz.pluzanski': {'name': 'T. Płużański', 'priority': 9, 'portal': 'kurier365'},
-        'binczyk': {'name': 'Arkadiusz Bińczyk', 'priority': 8, 'portal': 'kurier365'},
-        'arkadiusz.binczyk': {'name': 'Arkadiusz Bińczyk', 'priority': 8, 'portal': 'kurier365'},
+        'uokik.gov.pl': {'name': 'UOKiK', 'priority': 9, 'portal': 'kurier365'},
+        'biuro.prasowe@zabka.pl': {'name': 'Zabka Biuro Prasowe', 'priority': 9, 'portal': 'kurier365'},
+        'zabka.pl': {'name': 'Zabka Polska', 'priority': 9, 'portal': 'kurier365'},
 
-        # === NOWI WSPÓŁPRACOWNICY (P0) ===
-        # Nowi współpracownicy (01.09.2026)
-        'juchniewicz': {'name': 'Juchniewicz', 'priority': 9, 'portal': 'kurier365'},
-        'bolek': {'name': 'Bolek', 'priority': 9, 'portal': 'kurier365'},
-        'zabka': {'name': 'Zabka Biuro Prasowe', 'priority': 9, 'portal': 'kurier365'},
-        'żabka': {'name': 'Zabka Biuro Prasowe', 'priority': 9, 'portal': 'kurier365'},
+        # === SZCZEGÓŁOWI AUTORZY I REDAKTORZY (DISPLAY NAME MATCH) ===
+        'cezary rudziński': {'name': 'Cezary Rudziński', 'priority': 9, 'portal': 'kurier365'},
+        'tomasz płużański': {'name': 'T. Płużański', 'priority': 9, 'portal': 'kurier365'},
+        't. płużański': {'name': 'T. Płużański', 'priority': 9, 'portal': 'kurier365'},
+        'arkadiusz bińczyk': {'name': 'Arkadiusz Bińczyk', 'priority': 8, 'portal': 'kurier365'},
+        'bohdan juchniewicz': {'name': 'Bohdan Juchniewicz', 'priority': 9, 'portal': 'kurier365'},
+        'bohdanjuchniewicz@o2.pl': {'name': 'Bohdan Juchniewicz', 'priority': 9, 'portal': 'kurier365'},
+        'juliusz bolek': {'name': 'Juliusz Bolek', 'priority': 9, 'portal': 'kurier365'},
+        'j.bolek@wp.pl': {'name': 'Juliusz Bolek', 'priority': 9, 'portal': 'kurier365'},
+        'gryżewski': {'name': 'Gryżewski', 'priority': 9, 'portal': 'kurier365'},
+        'beata kalinowska': {'name': 'Beata Kalinowska', 'priority': 8, 'portal': 'kurier365'},
+        
+        # === AGENCJE / FUNDACJE (PEŁNE DOPASOWANIA) ===
         'maxmedia': {'name': 'Maxmedia', 'priority': 8, 'portal': 'kurier365'},
         'max-media': {'name': 'Maxmedia', 'priority': 8, 'portal': 'kurier365'},
-        'gryzewski': {'name': 'Gryżewski', 'priority': 9, 'portal': 'kurier365'},
-        'gryżewski': {'name': 'Gryżewski', 'priority': 9, 'portal': 'kurier365'},
-        'kalinowska': {'name': 'Beata Kalinowska', 'priority': 8, 'portal': 'kurier365'},
-        'beata.kalinowska': {'name': 'Beata Kalinowska', 'priority': 8, 'portal': 'kurier365'},
         'art-media': {'name': 'Art-Media', 'priority': 9, 'portal': 'kurier365'},
         'artmedia': {'name': 'Art-Media', 'priority': 9, 'portal': 'kurier365'},
-        'art_media': {'name': 'Art-Media', 'priority': 9, 'portal': 'kurier365'},
-        'fundacja': {'name': 'Fundacja XBW', 'priority': 8, 'portal': 'kurier365'},
-        'xbw': {'name': 'Fundacja XBW', 'priority': 9, 'portal': 'kurier365'},
+        'fundacja xbw': {'name': 'Fundacja XBW', 'priority': 8, 'portal': 'kurier365'},
+        '@xbw.pl': {'name': 'Fundacja XBW', 'priority': 8, 'portal': 'kurier365'}
     }
 
     def __init__(
@@ -155,8 +153,7 @@ class GmailSource(SourcePlugin):
         candidates = []
         token = self._get_token()
         if not token:
-            logger.warning('GmailSource: brak PRESSAI_JWT_USER')
-            return []
+            raise RuntimeError("CRITICAL [KAGANIEC]: Brak tokena PRESSAI_JWT_USER. Działanie źródła przerwane, system nie może zmyślać kandydatów!")
 
         headers = {'Authorization': f'Bearer {token}'}
         pressai_url = self.pressai_url
