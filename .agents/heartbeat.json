@@ -1,15 +1,13 @@
 {
   "callsign": "media-strateg",
-  "status": "working",
-  "current_task": "Selekcja merytoryczna tematów z Gmaila po reformacie (worker media-dev-30)",
-  "timestamp": "2026-09-04T20:02:00+02:00",
+  "status": "done",
+  "current_task": "Selekcja merytoryczna tematów z Gmaila",
+  "timestamp": "2026-09-04T20:41:00+02:00",
   "last_completed": [
-    "Handoff shorts (media-strateg 129 steps)",
-    "Shorts update Wolińska, Nil, Rulewski (2026-09-02_media-strateg_shorts_fix.md)",
-    "Reformat Workera (Kaganiec Fail-Fast, Filtry Nazwisk) - lokalnie"
+    "Reformat Workera (Kaganiec Fail-Fast, Filtry Nazwisk) - lokalnie",
+    "Selekcja kandydatów z Gmaila - ODRZUCONO, ścieżka zamknięta (04.09.2026)"
   ],
   "pending": [
-    "Wypchnięcie zmian z dysku (Lokal/VPS) na GitHub",
-    "Przedstawienie okna ask_question celem selekcji tematów z Gmaila"
+    "Wypchnięcie lokalnych poprawek z kodu (Kaganiec Fail-Fast) na GitHub"
   ]
 }
