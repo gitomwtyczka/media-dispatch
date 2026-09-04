@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""agents/kurier365-worker/worker.py
+\"\"\"agents/kurier365-worker/worker.py
 
 Kurier365Worker — instancja WorkerBase dla kurier365.pl i biznesciti.com
 media-dispatch | media-dev-36 | 01.09.2026
@@ -32,7 +32,7 @@ Status wdrożenia:
   Content Radar LIVE — aktywny gdy CONTENT_RADAR_JWT ustawiony.
   Discord notifications — aktywne gdy DISCORD_WEBHOOK_KURIER365 ustawiony.
   Google Sheets — aktywny gdy GOOGLE_SA_FILE ustawiony.
-"""
+\"\"\"
 import argparse
 import json
 import logging
@@ -102,7 +102,7 @@ CONFIG = {
 # ---------------------------------------------------------------------------
 
 def _get_target_portal(candidate: ContentCandidate) -> str:
-    """Wybierz portal docelowy na podstawie sekcji/kategorii kandydata."""
+    \"\"\"Wybierz portal docelowy na podstawie sekcji/kategorii kandydata.\"\"\"
     section = candidate.metadata.get('section', '')
     category = candidate.metadata.get('category', '')
     source = candidate.source.lower()
@@ -123,7 +123,7 @@ def _get_target_portal(candidate: ContentCandidate) -> str:
 
 
 def _should_auto_publish(candidate: ContentCandidate) -> bool:
-    """Sprawdź czy kandydat ma własne zdjęcia i powinien od razu trafić do WP draft."""
+    \"\"\"Sprawdź czy kandydat ma własne zdjęcia i powinien od razu trafić do WP draft.\"\"\"
     source_lower = candidate.source.lower()
     return any(kw in source_lower for kw in ['zabka', 'żabka', 'juchniewicz', 'rudzinski', 'rudinski'])
 
@@ -134,28 +134,32 @@ def build_generate_payload(
     selected_phrase: str = '',
     secondary_phrases: list = None
 ) -> dict:
-    """Buduje payload do POST /api/editor/generate w PressAI."""
+    \"\"\"Buduje payload do POST /api/editor/generate w PressAI.\"\"\"
     payload = {
         'title': candidate.title,
         'source_text': candidate.raw_content or candidate.summary or candidate.title,
         'source_url': candidate.content_url,
-        'portal': target_portal,
+        'target_portal': target_portal,
         'custom_instructions': (
-            'WYMAGANIA OBOWIĄZKOWE:\n'
-            '1. Artykuł MINIMUM 600 słów (lepiej 800-1000) — absolutnie nie może być krótszy.\n'
-            '2. Tytuł SEO (H1) MUSI zawierać główną frazę kluczową — nie omin tego wymogu.\n'
-            '3. Język polski, przystępny dla szerokiego czytelnika.\n'
-            '4. Optymalizacja pod Google Discover: angażujący wstęp, nagłówki H2/H3, wypunktowania.\n'
-            '5. FAQ na końcu artykułu (min 3 pytania i odpowiedzi).\n'
+            'WYMAGANIA OBOWIĄZKOWE:\\n'
+            '1. Artykuł MINIMUM 600 słów (lepiej 800-1000) — absolutnie nie może być krótszy.\\n'
+            '2. Tytuł SEO (H1) MUSI zawierać główną frazę kluczową — nie omin tego wymogu.\\n'
+            '3. Język polski, przystępny dla szerokiego czytelnika.\\n'
+            '4. Optymalizacja pod Google Discover: angażujący wstęp, nagłówki H2/H3, wypunktowania.\\n'
+            '5. FAQ na końcu artykułu (min 3 pytania i odpowiedzi).\\n'
             '6. Cross-link z BiznesCiti gdy temat biznesowy.'
         ),
+        'model_provider': 'anthropic',
+        'model_name': 'claude-sonnet-4-6',
         'generate_faq': True,
-        'min_words': 600,  # parametr minimalnej liczby słów PressAI
+        'min_words': 600,
+        'is_in_extenso': False,
+        'formats': ['analiza', 'feature']
     }
     if selected_phrase:
         payload['selected_phrase'] = selected_phrase
     if secondary_phrases:
-        payload['secondary_phrases'] = secondary_phrases
+        payload['seo_context'] = "Dodatkowe frazy poboczne (uwzględnij naturalnie w tekście): " + ", ".join(secondary_phrases)
     return payload
 
 
@@ -164,17 +168,17 @@ def build_generate_payload(
 # ---------------------------------------------------------------------------
 
 def write_candidates_to_sheets(candidates: list, spreadsheet_id: str = '1HMuODAIOG8e_9VH-HitdL_TwBRwgFZ0vnSKAW7Wmyig') -> bool:
-    """Zapisuje kandydatów do zakładki Kandydaci w Google Sheets."""
+    \"\"\"Zapisuje kandydatów do zakładki Kandydaci w Google Sheets.\"\"\"
     try:
         from google.oauth2.service_account import Credentials
         import gspread
     except ImportError:
-        log.warning("Brak bibliotek google-auth / gspread — pomijam zapis do Sheets")
+        log.warning(\"Brak bibliotek google-auth / gspread — pomijam zapis do Sheets\")
         return False
 
     sa_file = os.getenv('GOOGLE_SA_FILE', '/home/ubuntu/otwock-data/muzeum/muzeum-drive-sa.json')
     if not os.path.exists(sa_file):
-        log.warning(f"Brak pliku service account ({sa_file}) — pomijam zapis do Sheets")
+        log.warning(f\"Brak pliku service account ({sa_file}) — pomijam zapis do Sheets\")
         return False
 
     try:
@@ -224,17 +228,17 @@ def update_candidate_in_sheets(
     collab_link: str = '',
     spreadsheet_id: str = '1HMuODAIOG8e_9VH-HitdL_TwBRwgFZ0vnSKAW7Wmyig'
 ) -> bool:
-    """Aktualizuje Status (kolumna L) i URL draftu WP (kolumna P) w Google Sheets."""
+    \"\"\"Aktualizuje Status (kolumna L) i URL draftu WP (kolumna P) w Google Sheets.\"\"\"
     try:
         from google.oauth2.service_account import Credentials
         import gspread
     except ImportError:
-        log.warning("Brak bibliotek google-auth / gspread — pomijam aktualizację Sheets")
+        log.warning(\"Brak bibliotek google-auth / gspread — pomijam aktualizację Sheets\")
         return False
 
     sa_file = os.getenv('GOOGLE_SA_FILE', '/home/ubuntu/otwock-data/muzeum/muzeum-drive-sa.json')
     if not os.path.exists(sa_file):
-        log.warning(f"Brak pliku service account ({sa_file}) — pomijam aktualizację Sheets")
+        log.warning(f\"Brak pliku service account ({sa_file}) — pomijam aktualizację Sheets\")
         return False
 
     try:
@@ -248,7 +252,7 @@ def update_candidate_in_sheets(
 
         cell = ws.find(candidate_id, in_column=1)
         if not cell:
-            log.warning(f"Kandydat {candidate_id} nie znaleziony w kolumnie A arkusza Kandydaci")
+            log.warning(f\"Kandydat {candidate_id} nie znaleziony w kolumnie A arkusza Kandydaci\")
             return False
 
         row_idx = cell.row
@@ -259,10 +263,10 @@ def update_candidate_in_sheets(
             {'range': f'Q{row_idx}', 'values': [[collab_link or '']]},
         ]
         ws.batch_update(updates, value_input_option='USER_ENTERED')
-        log.info(f"Zaktualizowano wiersz {row_idx} w Sheets: Status='{status}', WP_URL='{wp_url}'")
+        log.info(f\"Zaktualizowano wiersz {row_idx} w Sheets: Status='{status}', WP_URL='{wp_url}'\")
         return True
     except Exception as e:
-        log.error(f"Błąd aktualizacji statusu w Sheets dla {candidate_id}: {e}")
+        log.error(f\"Błąd aktualizacji statusu w Sheets dla {candidate_id}: {e}\")
         return False
 
 
@@ -271,7 +275,7 @@ def update_candidate_in_sheets(
 # ---------------------------------------------------------------------------
 
 class Kurier365Worker(WorkerBase):
-    """Orkiestrator contentu dla kurier365.pl i biznesciti.com.
+    \"\"\"Orkiestrator contentu dla kurier365.pl i biznesciti.com.
 
     Pipeline:
         1. collect_candidates() — zbiera z Gmail + FeedCrawler + Newseria
@@ -280,12 +284,12 @@ class Kurier365Worker(WorkerBase):
         4. Kandydaci sortowani (priority DESC, trend_score DESC)
         5. process(candidate) — generuje artykuł w PressAI, zapisuje do historii,
            aktualizuje Sheets ('w produkcji') i publikuje WP draft dla wyjątków.
-    """
+    \"\"\"
 
     def __init__(self, config: dict = None):
-        """Args:
+        \"\"\"Args:
             config: nadpisz domyślną konfigurację CONFIG (opcjonalne).
-        """
+        \"\"\"
         effective_config = {**CONFIG, **(config or {})}
         super().__init__(effective_config)
 
@@ -376,9 +380,9 @@ class Kurier365Worker(WorkerBase):
         return headers
 
     def _get_seo_phrases(self, source_text: str, source_url: str, portal_name: str, portal_url: str) -> tuple:
-        """Pobiera frazy SEO z PressAI phrase-candidates.
+        \"\"\"Pobiera frazy SEO z PressAI phrase-candidates.
         Zwraca: (selected_phrase: str, secondary_phrases: list[str])
-        """
+        \"\"\"
         token = self.pressai_token or os.environ.get('PRESSAI_JWT_USER') or os.environ.get('PRESSAI_JWT') or os.environ.get('PRESSAI_TOKEN', '')
         if not token:
             return '', []
@@ -390,7 +394,7 @@ class Kurier365Worker(WorkerBase):
                 'site_url': portal_url
             }
             r = requests.post(
-                f"{self.pressai_url}/api/editor/phrase-candidates",
+                f\"{self.pressai_url}/api/editor/phrase-candidates\",
                 json=payload,
                 headers={'Authorization': f'Bearer {token}'},
                 timeout=30
@@ -408,35 +412,35 @@ class Kurier365Worker(WorkerBase):
         return '', []
 
     def write_to_sheets(self, candidates: list, spreadsheet_id: str = None) -> bool:
-        """Zapisuje kandydatów do Google Sheets."""
+        \"\"\"Zapisuje kandydatów do Google Sheets.\"\"\"
         target_sid = spreadsheet_id or self.spreadsheet_id
         return write_candidates_to_sheets(candidates, spreadsheet_id=target_sid)
 
     def _extract_source_text(self, candidate: ContentCandidate) -> str:
-        """Pobiera natywny, pełny content z PressAI API (extractor.py) by uzyskać dosłowne wypowiedzi dla cytatów."""
+        \"\"\"Pobiera natywny, pełny content z PressAI API (extractor.py) by uzyskać dosłowne wypowiedzi dla cytatów.\"\"\"
         url = candidate.content_url
         if not url:
             return candidate.raw_content or candidate.summary or candidate.title
 
-        api_url = f"{self.pressai_url}/api/editor/extract"
+        api_url = f\"{self.pressai_url}/api/editor/extract\"
         headers = self._get_auth_headers()
         try:
-            log.info(f"Pobieranie natywnej treści z {api_url} dla {url}")
+            log.info(f\"Pobieranie natywnej treści z {api_url} dla {url}\")
             resp = requests.post(api_url, json={'url': url}, headers=headers, timeout=30)
             if resp.status_code == 200:
                 data = resp.json()
                 extracted_text = data.get('text', '')
                 if extracted_text and len(extracted_text) > 200:
-                    log.info(f"Natywny scraper PressAI zwrócił {len(extracted_text)} znaków (będą pełne cytaty!).")
+                    log.info(f\"Natywny scraper PressAI zwrócił {len(extracted_text)} znaków (będą pełne cytaty!).\")
                     return extracted_text
         except Exception as e:
-            log.warning(f"Błąd podczas /api/editor/extract: {e}")
+            log.warning(f\"Błąd podczas /api/editor/extract: {e}\")
             
-        log.warning("Natywny scraper zawiódł, używam fallbacku do tekstu z bazy/kandydata.")
+        log.warning(\"Natywny scraper zawiódł, używam fallbacku do tekstu z bazy/kandydata.\")
         return candidate.raw_content or candidate.summary or candidate.title
 
     def generate_article(self, candidate: ContentCandidate, target_portal: str) -> Optional[dict]:
-        """Wywołaj POST /api/editor/generate w PressAI."""
+        \"\"\"Wywołaj POST /api/editor/generate w PressAI.\"\"\"
         portal_urls = {
             'Kurier365': 'https://kurier365.pl',
             'BiznesCiti': 'https://biznesciti.com',
@@ -449,47 +453,67 @@ class Kurier365Worker(WorkerBase):
         rich_source_text = self._extract_source_text(candidate)
 
         selected_phrase, secondary_phrases = self._get_seo_phrases(
-            source_text=rich_source_text[:2000], # Używamy wzbogaconego tekstu
+            source_text=rich_source_text[:2000],
             source_url=candidate.content_url or '',
             portal_name=portal_name,
             portal_url=site_url
         )
 
-        url = f"{self.pressai_url}/api/editor/generate"
+        url = f\"{self.pressai_url}/api/editor/generate\"
         payload = build_generate_payload(
             candidate,
             target_portal,
             selected_phrase=selected_phrase,
             secondary_phrases=secondary_phrases
         )
-        # Nadpisujemy źródłowy tekst "golec" z kandydata tym co wyciągnął PressAI (będą cytaty!)
+        # Nadpisujemy źródłowy tekst tym co wyciągnął extractor! To naprawi błąd 0 słów.
         payload['source_text'] = rich_source_text
         
         headers = self._get_auth_headers()
 
-        log.info(f"Wysyłam zapytanie o generowanie artykułu do {url} dla portalu {target_portal} (fraza: '{selected_phrase}')")
+        log.info(f\"Wysyłam zapytanie o generowanie artykułu do {url} dla portalu {target_portal} (fraza: '{selected_phrase}')\")
         try:
             resp = requests.post(url, json=payload, headers=headers, timeout=180)
             if resp.status_code in (200, 201):
-                data = resp.json()
-                log.info(f"Pomyślnie wygenerowano artykuł w PressAI dla {candidate.id}")
-                return data
-            log.error(f"Błąd generowania w PressAI HTTP {resp.status_code}: {resp.text[:300]}")
+                # PressAI zwraca strumień Server-Sent Events (SSE). Szukamy ostatniej linii 'data: ' z wynikiem
+                final_data = None
+                lines = resp.text.strip().split('\\n')
+                for line in reversed(lines):
+                    if line.startswith('data: '):
+                        try:
+                            d = json.loads(line[6:])
+                            if 'result' in d:
+                                final_data = d['result']
+                                break
+                            elif 'generated_article' in d:
+                                final_data = d
+                                break
+                        except json.JSONDecodeError:
+                            continue
+                
+                if final_data:
+                    log.info(f\"Pomyślnie wygenerowano artykuł w PressAI dla {candidate.id}\")
+                    return final_data
+                else:
+                    log.error(f\"Nie udało się wyparsować wyniku SSE z odpowiedzi PressAI. Odpowiedź: {resp.text[:300]}\")
+                    return None
+            log.error(f\"Błąd generowania w PressAI HTTP {resp.status_code}: {resp.text[:300]}\")
         except Exception as e:
-            log.error(f"Wyjątek podczas generowania artykułu: {e}")
+            log.error(f\"Wyjątek podczas generowania artykułu: {e}\")
         return None
 
     def save_article_history(self, candidate: ContentCandidate, generated: dict, target_portal: str) -> Optional[dict]:
-        """Zapisz wygenerowany artykuł do historii PressAI (POST /api/articles/)."""
-        url = f"{self.pressai_url}/api/articles/"
+        \"\"\"Zapisz wygenerowany artykuł do historii PressAI (POST /api/articles/).\"\"\"
+        url = f\"{self.pressai_url}/api/articles/\"
         headers = self._get_auth_headers()
 
         article_payload = {
             'title': generated.get('title') or candidate.title,
-            'content': generated.get('content') or generated.get('body') or generated.get('html') or '',
+            'content': generated.get('generated_article') or generated.get('content') or generated.get('body') or generated.get('html') or '',
             'portal': target_portal,
             'source_url': candidate.content_url or '',
             'candidate_id': candidate.id,
+            'model_name': 'claude-sonnet-4-6',
             'meta': {
                 'faq': generated.get('faq'),
                 'seo_title': generated.get('seo_title'),
@@ -503,22 +527,22 @@ class Kurier365Worker(WorkerBase):
             resp = requests.post(url, json=article_payload, headers=headers, timeout=30)
             if resp.status_code in (200, 201):
                 saved = resp.json()
-                log.info(f"Zapisano artykuł do historii PressAI (ID: {saved.get('id', 'brak')})")
+                log.info(f\"Zapisano artykuł do historii PressAI (ID: {saved.get('id', 'brak')})\")
                 return saved
-            log.warning(f"Zapis do historii PressAI HTTP {resp.status_code}: {resp.text[:200]}")
+            log.warning(f\"Zapis do historii PressAI HTTP {resp.status_code}: {resp.text[:200]}\")
         except Exception as e:
-            log.error(f"Błąd podczas zapisu do historii PressAI: {e}")
+            log.error(f\"Błąd podczas zapisu do historii PressAI: {e}\")
         return None
 
     def publish_to_wp(self, candidate: ContentCandidate, generated: dict, target_portal: str) -> Optional[dict]:
-        """Wywołaj POST /api/publisher/publish w PressAI (dla wyjątków z własnymi zdjęciami)."""
-        url = f"{self.pressai_url}/api/publisher/publish"
+        \"\"\"Wywołaj POST /api/publisher/publish w PressAI (dla wyjątków z własnymi zdjęciami).\"\"\"
+        url = f\"{self.pressai_url}/api/publisher/publish\"
         headers = self._get_auth_headers()
 
         publish_payload = {
             'portal': target_portal,
             'title': generated.get('title') or candidate.title,
-            'content': generated.get('content') or generated.get('body') or generated.get('html') or '',
+            'content': generated.get('generated_article') or generated.get('content') or generated.get('body') or generated.get('html') or '',
             'status': 'draft',  # Zawsze draft w WP
             'source_url': candidate.content_url or '',
             'candidate_id': candidate.id,
@@ -530,50 +554,50 @@ class Kurier365Worker(WorkerBase):
             resp = requests.post(url, json=publish_payload, headers=headers, timeout=60)
             if resp.status_code in (200, 201):
                 pub_data = resp.json()
-                log.info(f"Opublikowano draft w WordPress dla {candidate.id}: {pub_data}")
+                log.info(f\"Opublikowano draft w WordPress dla {candidate.id}: {pub_data}\")
                 return pub_data
-            log.error(f"Błąd publikacji WP draft HTTP {resp.status_code}: {resp.text[:200]}")
+            log.error(f\"Błąd publikacji WP draft HTTP {resp.status_code}: {resp.text[:200]}\")
         except Exception as e:
-            log.error(f"Błąd podczas publikacji WP draft: {e}")
+            log.error(f\"Błąd podczas publikacji WP draft: {e}\")
         return None
 
-    def _generate_collab_link(self, post_id: int, email: str = "tobroz@gmail.com") -> str | None:
-        """Generate draft collab link via WP REST API."""
-        wp_user = os.environ.get("PRAWY_WP_USER", "")
-        wp_app_pass = os.environ.get("PRAWY_WP_APP_PASS", "")
+    def _generate_collab_link(self, post_id: int, email: str = \"tobroz@gmail.com\") -> str | None:
+        \"\"\"Generate draft collab link via WP REST API.\"\"\"
+        wp_user = os.environ.get(\"PRAWY_WP_USER\", \"\")
+        wp_app_pass = os.environ.get(\"PRAWY_WP_APP_PASS\", \"\")
         if not wp_user or not wp_app_pass:
-            log.warning("PRAWY_WP_USER / PRAWY_WP_APP_PASS not set — skipping collab link")
+            log.warning(\"PRAWY_WP_USER / PRAWY_WP_APP_PASS not set — skipping collab link\")
             return None
         try:
             import requests as req
             r = req.post(
-                "https://prawy.pl/wp-json/draft-collab/v1/generate",
-                json={"post_id": post_id, "email": email, "expire_on_publish": True},
+                \"https://prawy.pl/wp-json/draft-collab/v1/generate\",
+                json={\"post_id\": post_id, \"email\": email, \"expire_on_publish\": True},
                 auth=(wp_user, wp_app_pass),
                 timeout=10,
             )
             r.raise_for_status()
-            return r.json().get("link")
+            return r.json().get(\"link\")
         except Exception as e:
-            log.warning(f"collab link generation failed: {e}")
+            log.warning(f\"collab link generation failed: {e}\")
             return None
 
     def process(self, candidate: ContentCandidate) -> dict:
-        """Przetwarzanie zatwierdzonego kandydata:
+        \"\"\"Przetwarzanie zatwierdzonego kandydata:
         1. Określ portal docelowy (_get_target_portal)
         2. Wywołaj generowanie artykułu w PressAI (POST /api/editor/generate)
         3. Zapisz do historii PressAI (POST /api/articles/) BEZ publikacji
         4. WYJĄTEK: jeśli nadawca z własnymi zdjęciami (zabka, juchniewicz, rudzinski) -> publikuj draft WP
         5. Zaktualizuj Google Sheets: Status -> 'w produkcji', URL draftu WP pusty (lub URL jeśli wyjątek)
-        """
+        \"\"\"
         target_portal = _get_target_portal(candidate)
         auto_publish = _should_auto_publish(candidate)
-        log.info(f"Przetwarzanie kandydata {candidate.id} '{candidate.title[:50]}' -> Portal: {target_portal}, Auto-publish: {auto_publish}")
+        log.info(f\"Przetwarzanie kandydata {candidate.id} '{candidate.title[:50]}' -> Portal: {target_portal}, Auto-publish: {auto_publish}\")
 
         # 1. Generowanie artykułu
         generated = self.generate_article(candidate, target_portal)
         if not generated:
-            log.error(f"Generowanie nie powiodło się dla kandydata {candidate.id}")
+            log.error(f\"Generowanie nie powiodło się dla kandydata {candidate.id}\")
             return {'status': 'error', 'candidate_id': candidate.id, 'error': 'Generation failed'}
 
         # 2. Zapis do historii PressAI
@@ -591,7 +615,7 @@ class Kurier365Worker(WorkerBase):
                 if wp_post_id and target_portal == 'Prawy.pl':
                     collab_link = self._generate_collab_link(wp_post_id)
         else:
-            log.info(f"Artykuł {candidate.id} zapisany w historii PressAI — oczekuje na ręczne dodanie zdjęć i publikację.")
+            log.info(f\"Artykuł {candidate.id} zapisany w historii PressAI — oczekuje na ręczne dodanie zdjęć i publikację.\")
 
         # 4. Aktualizacja Sheets
         update_candidate_in_sheets(
@@ -621,7 +645,7 @@ def main():
     parser = argparse.ArgumentParser(
         description='kurier365-worker — Content pipeline dla kurier365.pl i biznesciti.com',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog=\"\"\"
 Przykłady:
   python worker.py --health
   python worker.py --run
@@ -642,7 +666,7 @@ Zmienne środowiskowe:
   DISCORD_WEBHOOK_PRIORITY    — Webhook URL Discord dla powiadomień priorytetowych (P0/Gmail)
   GOOGLE_SA_FILE              — Ścieżka do klucza Service Account Google
   SPREADSHEET_ID              — ID arkusza Google Sheets
-"""
+\"\"\"
     )
     parser.add_argument('--health', action='store_true', help='Status komponentów workera')
     parser.add_argument('--run', action='store_true', help='Zbierz kandydatów ze źródeł')
@@ -659,23 +683,23 @@ Zmienne środowiskowe:
         if args.json:
             print(json.dumps(status, indent=2, ensure_ascii=False))
         else:
-            print(f"Worker: {status['worker']}")
-            print(f"State file: {status['state_file']}")
-            print("Sources:")
+            print(f\"Worker: {status['worker']}\")
+            print(f\"State file: {status['state_file']}\")
+            print(\"Sources:\")
             for s in status['sources']:
                 icon = '✅' if s['healthy'] else '❌ (placeholder)'
-                print(f"  {icon} {s['name']}")
+                print(f\"  {icon} {s['name']}\")
             signals = status['trend_signals']
-            print(f"Trend signals: {', '.join(signals) if signals else 'none'}")
+            print(f\"Trend signals: {', '.join(signals) if signals else 'none'}\")
             cr_jwt = os.environ.get('CONTENT_RADAR_JWT')
-            print(f"Content Radar JWT: {'SET (✅ LIVE)' if cr_jwt else 'NOT SET (⚠️ trends disabled)'}")
+            print(f\"Content Radar JWT: {'SET (✅ LIVE)' if cr_jwt else 'NOT SET (⚠️ trends disabled)'}\")
             discord_url = os.environ.get('DISCORD_WEBHOOK_KURIER365')
-            print(f"Discord Webhook: {'SET (✅ LIVE)' if discord_url else 'NOT SET (⚠️ discord disabled)'}")
+            print(f\"Discord Webhook: {'SET (✅ LIVE)' if discord_url else 'NOT SET (⚠️ discord disabled)'}\")
             priority_url = os.environ.get('DISCORD_WEBHOOK_PRIORITY')
-            print(f"Discord Priority Webhook: {'SET (✅ LIVE)' if priority_url else 'NOT SET'}")
+            print(f\"Discord Priority Webhook: {'SET (✅ LIVE)' if priority_url else 'NOT SET'}\")
             sa_file = os.environ.get('GOOGLE_SA_FILE', '/home/ubuntu/otwock-data/muzeum/muzeum-drive-sa.json')
             sa_ok = os.path.exists(sa_file)
-            print(f"Google SA File: {'SET (✅ FOUND)' if sa_ok else f'NOT FOUND ({sa_file})'}")
+            print(f\"Google SA File: {'SET (✅ FOUND)' if sa_ok else f'NOT FOUND ({sa_file})'}\")
         return
 
     if args.process:
@@ -715,15 +739,15 @@ Zmienne środowiskowe:
         if args.json:
             print(json.dumps([c.to_dict() for c in top], indent=2, ensure_ascii=False))
         else:
-            print(f"\nZnaleziono {len(candidates)} kandydatów. Top-{len(top)}:\n")
+            print(f\"\\nZnaleziono {len(candidates)} kandydatów. Top-{len(top)}:\\n\")
             for c in top:
-                trend = f" trend={c.trend_score:.2f}" if c.trend_score > 0 else ""
-                geo = f" [{c.metadata.get('geo_relevance', '')}]" if 'geo_relevance' in c.metadata else ""
-                print(f"  [{c.priority:2d}] [{c.source:20s}]{trend}{geo} {c.title[:70]}")
+                trend = f\" trend={c.trend_score:.2f}\" if c.trend_score > 0 else \"\"
+                geo = f\" [{c.metadata.get('geo_relevance', '')}]\" if 'geo_relevance' in c.metadata else \"\"
+                print(f\"  [{c.priority:2d}] [{c.source:20s}]{trend}{geo} {c.title[:70]}\")
             if len(candidates) > args.top:
-                print(f"  ... i {len(candidates) - args.top} więcej")
+                print(f\"  ... i {len(candidates) - args.top} więcej\")
             if discord_sent > 0:
-                print(f"\nWysłano {discord_sent} powiadomień do Discord.")
+                print(f\"\\nWysłano {discord_sent} powiadomień do Discord.\")
         return
 
     parser.print_help()
