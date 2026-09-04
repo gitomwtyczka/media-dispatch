@@ -1,14 +1,15 @@
 {
   "callsign": "media-strateg",
   "status": "working",
-  "current_task": "Delegowanie aktualizacji 5 starych shortów (z 30.08) do workera media-dev-01",
-  "timestamp": "2026-09-02T00:28:00+02:00",
+  "current_task": "Selekcja merytoryczna tematów z Gmaila po reformacie (worker media-dev-30)",
+  "timestamp": "2026-09-04T20:02:00+02:00",
   "last_completed": [
     "Handoff shorts (media-strateg 129 steps)",
-    "Shorts update Wolińska, Nil, Rulewski (2026-09-02_media-strateg_shorts_fix.md)"
+    "Shorts update Wolińska, Nil, Rulewski (2026-09-02_media-strateg_shorts_fix.md)",
+    "Reformat Workera (Kaganiec Fail-Fast, Filtry Nazwisk) - lokalnie"
   ],
   "pending": [
-    "Aktualizacja 5 shortów z 30 sierpnia przez workera",
-    "Zaplanowanie publikacji shortów na 5-9 września"
+    "Wypchnięcie zmian z dysku (Lokal/VPS) na GitHub",
+    "Przedstawienie okna ask_question celem selekcji tematów z Gmaila"
   ]
 }
