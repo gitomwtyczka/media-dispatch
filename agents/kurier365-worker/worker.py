@@ -304,8 +304,11 @@ class Kurier365Worker(WorkerBase):
         # Źródła (Sources)
         # ------------------------------------------------------------------
 
+        enabled_source = effective_config.get('enabled_source')
+
         # Gmail — monitorowanie skrzynki przez PressAI API (tobroz@gmail.com)
-        self.add_source(GmailSource(
+        if not enabled_source or enabled_source == 'gmail':
+            self.add_source(GmailSource(
             pressai_url=self.pressai_url,
             portal='kurier365',
             token=self.pressai_token,
@@ -314,7 +317,8 @@ class Kurier365Worker(WorkerBase):
         ))
 
         # Feed Crawler — 13k+ źródeł RSS (UOKiK, PAP, Nauka, ISBNews, Biznes, etc.)
-        self.add_source(FeedCrawlerSource(
+        if not enabled_source or enabled_source == 'feedcrawler':
+            self.add_source(FeedCrawlerSource(
             api_url=feed_crawler_url,
             portal='kurier365',
             categories=['prawo', 'konsument', 'uokik', 'gospodark', 'nauka', 'pap', 'biznes', 'finans', 'podatk', 'rynek', 'wnp', 'inflacj', 'cen', 'pols'],
@@ -324,7 +328,8 @@ class Kurier365Worker(WorkerBase):
         ))
 
         # Dział NAUKA (Tier 1 Scientific + popularnonaukowe PL)
-        self.add_source(FeedCrawlerSource(
+        if not enabled_source or enabled_source == 'feedcrawler':
+            self.add_source(FeedCrawlerSource(
             api_url=feed_crawler_url,
             portal='kurier365',
             departments=['science-high-tech', 'health-biotech'],
@@ -333,7 +338,8 @@ class Kurier365Worker(WorkerBase):
         ))
 
         # Geostrategia periodyczna (Chiny/Indie/Rosja + obrona)
-        self.add_source(FeedCrawlerSource(
+        if not enabled_source or enabled_source == 'feedcrawler':
+            self.add_source(FeedCrawlerSource(
             api_url=feed_crawler_url,
             portal='kurier365',
             departments=['defence-geopolitics'],
@@ -342,7 +348,8 @@ class Kurier365Worker(WorkerBase):
         ))
 
         # Newseria — agencja B2B z Eco-Bias Gate
-        self.add_source(NewseriaSource(
+        if not enabled_source or enabled_source == 'newseria':
+            self.add_source(NewseriaSource(
             portal='kurier365.pl',
             username=effective_config.get('newseria_username'),
             password=effective_config.get('newseria_password'),
@@ -670,13 +677,14 @@ Zmienne środowiskowe:
     )
     parser.add_argument('--health', action='store_true', help='Status komponentów workera')
     parser.add_argument('--run', action='store_true', help='Zbierz kandydatów ze źródeł')
+    parser.add_argument('--source', type=str, help='Zawęź do konkretnego źródła (np. gmail, feedcrawler, newseria)')
     parser.add_argument('--top', type=int, default=10, metavar='N', help='Pokaż top-N kandydatów (domyślnie 10)')
     parser.add_argument('--sheets', action='store_true', help='Zapisz zebranych kandydatów do Google Sheets')
     parser.add_argument('--json', action='store_true', help='Output jako JSON')
     parser.add_argument('--process', metavar='CANDIDATE_ID', help='Przetwórz pojedynczego kandydata przez PressAI')
     args = parser.parse_args()
 
-    worker = Kurier365Worker()
+    worker = Kurier365Worker(config={'enabled_source': args.source} if 'source' in args and args.source else {})
 
     if args.health:
         status = worker.health_check()
