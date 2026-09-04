@@ -103,6 +103,11 @@ Zaimplementowano rozszerzalną architekturę Plugin-based Workers:
 - **`biznesciti-worker`** — instancja WorkerBase dla biznesciti.com
 - **`pressai-worker`** — rozszerzenie o playbooki per portal
 
+### FAZA 2b: Dashboard Redaktora (Crimson UI) i Dynamiczne API (Nowe)
+- Zastąpienie testowego "okna zapytań IDE" przez natywny widok w przeglądarce wewn. struktury Crimson/PressAI.
+- Zbudowanie webhooków HTTP omijających monity (autoryzacje terminalowe) dla Redaktora Naczelnego.
+- Możliwość elastycznego i dynamicznego zapytywania (Query Engine): `GET /api/candidates?count=5&portal=prawy&category=biznes&source=gmail_priority`.
+
 ### FAZA 3: Discord Editorial Center (Future) `[odroczone 01.09.2026 — priorytet: uruchomienie publikacji]`
 - Interaktywne centrum redakcyjne na Discordzie
 - FastAPI Interactions endpoint (`/api/v1/discord/interactions`) + Discord Webhooks + Embeds z przyciskami (Action Row: Akceptuj, Odrzuć, Odrocz D+1, Odrocz D+7, Uwagi przez Modal)
