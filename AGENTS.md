@@ -133,6 +133,18 @@ Naruszenie tej reguły = błąd krytyczny wymagający natychmiastowego rewertu.
 
 ---
 
+## ABSOLUTE SSH COMPLIANCE — Zasady pracy Workerów Zdalnych
+
+> Dodane: 04.09.2026 | Odpowiedź na halucynacje z omijaniem protokołów w oparciu o GUI.
+
+Zabrania się uruchamiania przeglądarek (Chrome/Wetty/panele) przez Subagentów-Workerów, gdy zawiodą narzędzia powłoki. 
+Worker ma zakaz naprawiania błędów (np. błędy 'Cwd' czy escape'owania cudzysłowów) poprzez ucieczkę do interfejsu graficznego.
+Nowy standard operacyjny definiuje Subagenta `vps_worker` jako wyłącznego wykonawcę zadań produkcyjnych na serwerze:
+- Worker ten jest ślepym egzekutorem i przyjmuje komendy systemowe 1:1.
+- Jakikolwiek błąd wywołania skutkuje powrotem do Supervisora ze statusem Failed i logiem błędu, bez prób użycia interfejsów GUI.
+
+---
+
 ## Pre-flight checklist dla media-dev / media-deploy
 
 Przed pierwszym `run_command` lub wywołaniem VSE API:
