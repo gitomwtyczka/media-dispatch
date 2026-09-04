@@ -1,14 +1,13 @@
 {
   "callsign": "media-dev-30",
-  "status": "working",
+  "status": "done",
   "current_task": "Testowanie content radar i naprawa gmail_source.py",
-  "timestamp": "2026-09-04T20:55:00+02:00",
+  "timestamp": "2026-09-04T21:45:00+02:00",
   "last_completed": [
-    "Reformat Workera (Kaganiec Fail-Fast, Filtry Nazwisk) - lokalnie",
-    "Selekcja kandydatów z Gmaila - ODRZUCONO, ścieżka zamknięta (04.09.2026)"
+    "Naprawa gmail_source.py (twarde e-maile współpracowników)",
+    "Filtrowanie krótkich wymian zdań (pingów) w GmailSource"
   ],
   "pending": [
-    "Naprawa gmail_source.py (twarde e-maile, odróżnianie krótkiej wymiany zdań)",
-    "Testowanie content radar z agents/kurier365-worker/worker.py"
+    "Testowanie content radar pod nadzorem na nowym chacie"
   ]
 }
