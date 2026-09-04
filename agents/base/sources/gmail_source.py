@@ -26,33 +26,25 @@ class GmailSource(SourcePlugin):
     #                    7-8  = P0/P1 (złoty w Sheets)
     # Dodawaj fragm. domeny (@art-media.pl) lub imienia/nazwiska (rudzinski)
     # TODO: Uzupełnić o dokładne adresy email współpracowników gdy znane
-    PRIORITY_SENDERS = {
-        # === DOMENY KORPORACYJNE I ZASTOSOWANIA OGÓLNE ===
-        'wei.org.pl': {'name': 'WEI', 'priority': 9, 'portal': 'kurier365'},
-        'bialykruk.pl': {'name': 'Biały Kruk', 'priority': 8, 'portal': 'kurier365'},
-        'uokik.gov.pl': {'name': 'UOKiK', 'priority': 9, 'portal': 'kurier365'},
-        'biuro.prasowe@zabka.pl': {'name': 'Zabka Biuro Prasowe', 'priority': 9, 'portal': 'kurier365'},
-        'zabka.pl': {'name': 'Zabka Polska', 'priority': 9, 'portal': 'kurier365'},
+    PRIORITY_DOMAINS = {
+        '@wei.org.pl': {'name': 'WEI', 'priority': 9, 'portal': 'kurier365'},
+        '@bialykruk.pl': {'name': 'Biały Kruk', 'priority': 8, 'portal': 'kurier365'},
+        '@uokik.gov.pl': {'name': 'UOKiK', 'priority': 9, 'portal': 'kurier365'},
+        '@zabka.pl': {'name': 'Żabka Polska', 'priority': 9, 'portal': 'kurier365'},
+        '@art-media.com.pl': {'name': 'Art-Media', 'priority': 9, 'portal': 'kurier365'},
+        '@fundacjaxbw.pl': {'name': 'Fundacja XBW', 'priority': 8, 'portal': 'kurier365'},
+        '@maxmedia.org.pl': {'name': 'Maxmedia', 'priority': 8, 'portal': 'kurier365'},
+    }
 
-        # === SZCZEGÓŁOWI AUTORZY I REDAKTORZY (DISPLAY NAME MATCH) ===
-        'cezary rudziński': {'name': 'Cezary Rudziński', 'priority': 9, 'portal': 'kurier365'},
-        'tomasz płużański': {'name': 'T. Płużański', 'priority': 9, 'portal': 'kurier365'},
-        't. płużański': {'name': 'T. Płużański', 'priority': 9, 'portal': 'kurier365'},
-        'arkadiusz bińczyk': {'name': 'Arkadiusz Bińczyk', 'priority': 8, 'portal': 'kurier365'},
-        'bohdan juchniewicz': {'name': 'Bohdan Juchniewicz', 'priority': 9, 'portal': 'kurier365'},
+    PRIORITY_EMAILS = {
+        'abinczyk@icloud.com': {'name': 'Arkadiusz Bińczyk', 'priority': 8, 'portal': 'kurier365'},
+        'jbolek@wp.pl': {'name': 'Juliusz Bolek', 'priority': 9, 'portal': 'kurier365'},
         'bohdanjuchniewicz@o2.pl': {'name': 'Bohdan Juchniewicz', 'priority': 9, 'portal': 'kurier365'},
-        'juliusz bolek': {'name': 'Juliusz Bolek', 'priority': 9, 'portal': 'kurier365'},
-        'j.bolek@wp.pl': {'name': 'Juliusz Bolek', 'priority': 9, 'portal': 'kurier365'},
-        'gryżewski': {'name': 'Gryżewski', 'priority': 9, 'portal': 'kurier365'},
-        'beata kalinowska': {'name': 'Beata Kalinowska', 'priority': 8, 'portal': 'kurier365'},
-        
-        # === AGENCJE / FUNDACJE (PEŁNE DOPASOWANIA) ===
-        'maxmedia': {'name': 'Maxmedia', 'priority': 8, 'portal': 'kurier365'},
-        'max-media': {'name': 'Maxmedia', 'priority': 8, 'portal': 'kurier365'},
-        'art-media': {'name': 'Art-Media', 'priority': 9, 'portal': 'kurier365'},
-        'artmedia': {'name': 'Art-Media', 'priority': 9, 'portal': 'kurier365'},
-        'fundacja xbw': {'name': 'Fundacja XBW', 'priority': 8, 'portal': 'kurier365'},
-        '@xbw.pl': {'name': 'Fundacja XBW', 'priority': 8, 'portal': 'kurier365'}
+        'beata-bea@wp.pl': {'name': 'Beata Kalinowska', 'priority': 8, 'portal': 'kurier365'},
+        'tadeusz.pluzanski@fundacjalaczka.pl': {'name': 'T. Płużański', 'priority': 9, 'portal': 'kurier365'},
+        't_pluzanski@o2.pl': {'name': 'T. Płużański', 'priority': 9, 'portal': 'kurier365'},
+        'cezrudzinski@post.pl': {'name': 'Cezary Rudziński', 'priority': 9, 'portal': 'kurier365'},
+        'mgryzewski@maxmedia.org.pl': {'name': 'Gryżewski', 'priority': 9, 'portal': 'kurier365'},
     }
 
     def __init__(
@@ -121,31 +113,21 @@ class GmailSource(SourcePlugin):
             self.logger.warning(f"Nie udało się zapisać stanu do {self.state_file}: {e}")
 
     def _detect_sender(self, from_addr: str) -> Optional[dict]:
-        """Identyfikuj priorytetowego nadawcę."""
+        """Identyfikuj priorytetowego nadawcę (twardo po adresie email)."""
         if not from_addr:
             return None
-        from_lower = from_addr.lower()
+            
+        import re
+        match = re.search(r'<([^>]+)>', from_addr)
+        hard_email = match.group(1).lower().strip() if match else from_addr.lower().strip()
 
-        # Sprawdź niestandardową listę/słownik jeśli przekazano
-        if isinstance(self.allowed_senders, dict):
-            for key, info in self.allowed_senders.items():
-                if key.lower() in from_lower:
-                    return info
-        elif isinstance(self.allowed_senders, list):
-            for item in self.allowed_senders:
-                pattern = item.get('email', '').lower().replace('*', '')
-                if pattern and pattern in from_lower:
-                    return {
-                        'name': item.get('name', pattern),
-                        'priority': item.get('priority', 8 if not item.get('requires_review') else 9),
-                        'portal': item.get('portal', self.portal),
-                        'requires_review': item.get('requires_review', True)
-                    }
-
-        # Domyślna lista PRIORITY_SENDERS
-        for key, info in self.PRIORITY_SENDERS.items():
-            if key in from_lower:
+        if hard_email in self.PRIORITY_EMAILS:
+            return self.PRIORITY_EMAILS[hard_email]
+            
+        for domain, info in self.PRIORITY_DOMAINS.items():
+            if hard_email.endswith(domain):
                 return info
+                
         return None
 
     def fetch(self) -> List[ContentCandidate]:
@@ -197,6 +179,28 @@ class GmailSource(SourcePlugin):
             # Filtruj po priorytetowych nadawcach
             sender_info = self._detect_sender(sender)
             if not sender_info:
+                continue
+
+            # Heurystyka "Wymiany zdań" vs "Materiał"
+            snippet = msg.get('snippet', '').lower()
+            subject = msg.get('subject', '').lower()
+            has_attachments = msg.get('has_attachments', False) or bool(msg.get('attachments', []))
+            
+            is_material = False
+            keywords = ['zaproszenie', 'materiały', 'informacja', 'artykuł', 'komunikat', 'oświadczenie', 'przesyłam', 'w załączeniu']
+            if any(kw in subject or kw in snippet for kw in keywords):
+                is_material = True
+            if has_attachments:
+                is_material = True
+            if len(snippet) > 100:
+                is_material = True
+                
+            words = snippet.split()
+            if len(words) < 10 and not has_attachments:
+                is_material = False
+                
+            if not is_material:
+                self.logger.info(f"Odrzucono jako wymianę zdań (ping): {subject} od {sender}")
                 continue
 
             # Deduplikacja
