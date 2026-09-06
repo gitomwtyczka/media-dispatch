@@ -1,11 +1,15 @@
 {
-  "callsign": "media-dev-30",
+  "callsign": "media-dev-worker",
   "status": "done",
-  "current_task": "biblia-sheets-sync and recovery",
-  "timestamp": "2026-09-06T14:56:00Z",
+  "current_task": "Zbudowanie architektury emisja-worker i radar-worker (Google Sheets sync)",
+  "timestamp": "2026-09-06T14:55:00Z",
   "last_completed": [
-    "Recovery Batch (09.09 - 12.09) - UTC fix and skip WP inject for Wed",
-    "Created biblia_sheets_sync.py worker for Google Sheets integration"
+    "Raport w sonic-void/inbox - commit e91278c2dd9d506173469375554423f8a14a7ff2",
+    "Raport w media-dispatch - commit 7af253c4dec63d11d87635923b93c5a30c3f8116",
+    "Aktualizacja current.md - commit f17eff66fa442ba3e1b079c46908a80597f483be"
   ],
-  "pending": []
+  "pending": [
+    "Konfiguracja PRESSAI_JWT_USER w .env serwera dla radar_sheets_sync.py",
+    "Wdrożenie skryptów workerów na VPS (media-deploy)"
+  ]
 }
