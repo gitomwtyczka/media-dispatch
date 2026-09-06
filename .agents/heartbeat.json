@@ -1,13 +1,10 @@
 {
   "callsign": "media-dev-30",
   "status": "done",
-  "current_task": "Testowanie content radar i naprawa gmail_source.py",
-  "timestamp": "2026-09-04T21:45:00+02:00",
+  "current_task": "Wdrożenie poprawek do skryptów radar_sheets_sync.py i emisja_sheets_sync.py",
+  "timestamp": "2026-09-06T20:30:00+02:00",
   "last_completed": [
-    "Naprawa gmail_source.py (twarde e-maile współpracowników)",
-    "Filtrowanie krótkich wymian zdań (pingów) w GmailSource"
+    "Hotfix: Radar & Emisja (autoryzacja, mapowanie, obrazki) - commit 419041c"
   ],
-  "pending": [
-    "Testowanie content radar pod nadzorem na nowym chacie"
-  ]
+  "pending": []
 }
