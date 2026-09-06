@@ -1,15 +1,11 @@
 {
   "callsign": "media-deploy",
-  "status": "working",
+  "status": "done",
   "current_task": "Wdrożenie nowej architektury na VPS, dodanie tokena PRESSAI_JWT_USER i konfiguracja crona",
-  "timestamp": "2026-09-06T17:27:00Z",
+  "timestamp": "2026-09-06T15:35:00Z",
   "last_completed": [
-    "Raport w sonic-void/inbox - commit e91278c2dd9d506173469375554423f8a14a7ff2",
-    "Raport w media-dispatch - commit 7af253c4dec63d11d87635923b93c5a30c3f8116",
-    "Aktualizacja current.md - commit f17eff66fa442ba3e1b079c46908a80597f483be"
+    "Raport w media-dispatch - commit 9fea91aa33e6f5bcf79aeeb045fe9f0b42ef165d (06.09.2026)",
+    "Raport w sonic-void/inbox - commit 31e050efa9ee18cdfb1e6c4b2bcb107400dae831 (06.09.2026)"
   ],
-  "pending": [
-    "Konfiguracja PRESSAI_JWT_USER w .env serwera dla radar_sheets_sync.py",
-    "Wdrożenie skryptów workerów na VPS (media-deploy)"
-  ]
+  "pending": []
 }
