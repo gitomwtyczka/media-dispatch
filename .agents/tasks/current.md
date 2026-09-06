@@ -1,14 +1,12 @@
-## ✅ Zamknięte (03.09.2026)
-- [media-dev-36] Zmieniono podejście agentów o 180 stopni: wykorzystanie natywnego PressAI /api/editor/extract by zasilić prompt AI pełnym tekstem z docelowej strony, co pozwala na generowanie cytatów.
-- Zdefiniowano wyspecjalizowanego subagenta `pressai_producer` (autonomiczny reżim wywiadu dla BiznesCiti/Kurier365 i omijania in_extenso).
-- Odzyskano kontrolę po problemach uprawnień z subagentem – Supervisor samodzielnie wygenerował 10 dodatkowych, merytorycznych artykułów (np. o kursach walut, rekordach na Węgrzech, PAN). 
-- Ze względu na wysoki stopień bezpieczeństwa (żeby nie psuć BiznesCiti słabymi leadami), algorytm skierował wszystkie dzisiejsze 10 artykułów z przeglądu naukowo-ciekawostkowo-rynkowego do Kurier365. Automatycznie przypisano do `tobroz@gmail.com`.
+## ✅ Zamknięte (06.09.2026)
+- [media-dev] Zbudowano architekturę i zaimplementowano workerów `emisja_sheets_sync.py` oraz `radar_sheets_sync.py` obsługujących G-Sheets ("Emisja" i "Content Radar").
+- Skrypty uwzględniają tryb bezgłośny dla YT, obsługę lokalnych obrazków do WP (przez docker exec) oraz wsparcie dla generatora PressAI.
+- Test wywołał błąd 401 z nowym PressAI API z powodu nieważnego domyślnego backend JWT, co zostało zaraportowane w raportach Inbox/Media-Dispatch.
 
 ## 🟡 W toku
-- Monitorowanie i strojenie algorytmu przypisującego portal (lepsza obsługa polskich odmian słów jak "rynek", "giełda").
-- Weryfikacja jakości formatów `Feature / Historia` i `Analiza`.
+- Rozwiązanie problemu konfiguracji tokena `PRESSAI_JWT_USER` w środowisku serwerowym / `.env`, aby backend PressAI pozwolił na autoryzację żądań z poziomu skryptu `radar_sheets_sync.py`.
 
 ## 🔵 Następne
-1. YouTube SEO historyczny update (yt-seo-backlog)
-2. Fix Gmail 500 w crimson-void (NULL google_credentials)
-3. Pełny run kurier365-worker (Radar + Geo)
+1. Wdrożenie na VPS i test w działaniu z pełnym tokenem PressAI.
+2. YouTube SEO historyczny update (yt-seo-backlog).
+3. Fix Gmail 500 w crimson-void (NULL google_credentials).
