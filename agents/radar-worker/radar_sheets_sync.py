@@ -21,9 +21,9 @@ def get_pressai_jwt():
     return token
 
 def get_radar_jwt():
-    token = os.environ.get('PRESSAI_JWT_USER')
+    token = os.environ.get('CONTENT_RADAR_JWT')
     if not token:
-        raise RuntimeError("Brak tokenu PRESSAI_JWT_USER w .env")
+        raise RuntimeError("Brak tokenu CONTENT_RADAR_JWT w .env")
     return token
 
 def auth_header(token): 
@@ -34,8 +34,8 @@ def ensure_sheet(gc, sh):
         ws = sh.worksheet(TAB_NAME)
     except gspread.exceptions.WorksheetNotFound:
         print(f"Tworzę nową zakładkę '{TAB_NAME}'")
-        ws = sh.add_worksheet(title=TAB_NAME, rows="100", cols="6")
-        ws.update('A1:F1', [["Temat", "Źródło", "Tytuł SEO", "Frazy kluczowe", "Obrazek główny", "Status"]])
+        ws = sh.add_worksheet(title=TAB_NAME, rows="100", cols="8")
+        ws.update('A1:H1', [["Temat", "Źródło", "Link do źródła", "Data opublikowania źródła", "Tytuł SEO", "Frazy kluczowe", "Obrazek główny", "Status"]])
     return ws
 
 def mode_fetch(ws):
@@ -61,7 +61,7 @@ def mode_fetch(ws):
             print("Brak trendów.")
             return
             
-        existing_urls = [row[1] for row in ws.get_all_values()[1:] if len(row) > 1]
+        existing_urls = [row[2] for row in ws.get_all_values()[1:] if len(row) > 2]
         
         new_rows = []
         for p in posts:
@@ -70,7 +70,9 @@ def mode_fetch(ws):
                 title = p.get('title') or p.get('summary', '')
                 new_rows.append([
                     title,
+                    "",
                     url,
+                    "",
                     "",
                     "",
                     "",
@@ -87,19 +89,19 @@ def mode_fetch(ws):
         print(f"Błąd podczas pobierania trendów: {e}")
 
 def process_row_publish(row, row_idx, ws, pressai_token):
-    # 6 kolumn: 0:Temat, 1:Źródło, 2:Tytuł SEO, 3:Frazy, 4:Obrazek, 5:Status
-    while len(row) < 6:
+    # 8 kolumn: 0:Temat, 1:Źródło, 2:Link, 3:Data, 4:Tytuł SEO, 5:Frazy, 6:Obrazek, 7:Status
+    while len(row) < 8:
         row.append("")
         
-    status = row[5].strip()
+    status = row[7].strip()
     if status != "Publikuj w PressAI":
         return
         
     temat = row[0].strip()
-    url = row[1].strip()
-    tytul_seo = row[2].strip()
-    frazy = row[3].strip()
-    obrazek = row[4].strip()
+    url = row[2].strip()
+    tytul_seo = row[4].strip()
+    frazy = row[5].strip()
+    obrazek = row[6].strip()
     
     if not tytul_seo:
         tytul_seo = temat
@@ -136,17 +138,13 @@ def process_row_publish(row, row_idx, ws, pressai_token):
         print(f"  [BŁĄD] Generacja nie powiodła się: {r_gen.text[:200]}")
         return
         
-    # SSE parsing z generatora PressAI
-    lines = r_gen.text.strip().split('\n')
-    generated_text = ""
-    for line in reversed(lines):
-        if line.startswith("data: "):
-            try:
-                data = json.loads(line[6:])
-                generated_text = data.get("content", "")
-                break
-            except:
-                pass
+    # Parsowanie odpowiedzi JSON z generatora
+    try:
+        resp_json = r_gen.json()
+        generated_text = resp_json.get('result', {}).get('generated_article', '')
+    except Exception as e:
+        print(f"  [BŁĄD] Parsowanie JSON z generatora: {e}")
+        return
                 
     if not generated_text:
         print("  [BŁĄD] Pusty wynik z generatora.")
@@ -190,7 +188,7 @@ def process_row_publish(row, row_idx, ws, pressai_token):
         
     # KROK 6: Aktualizacja excela
     try:
-        ws.update_cell(row_idx + 1, 6, "Opublikowane")
+        ws.update_cell(row_idx + 1, 8, "Opublikowane")
     except Exception as e:
         print(f"  [BŁĄD] Aktualizacja arkusza: {e}")
 
