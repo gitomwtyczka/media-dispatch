@@ -1,8 +1,8 @@
 {
-  "callsign": "media-dev-worker",
-  "status": "done",
-  "current_task": "Zbudowanie architektury emisja-worker i radar-worker (Google Sheets sync)",
-  "timestamp": "2026-09-06T14:55:00Z",
+  "callsign": "media-deploy",
+  "status": "working",
+  "current_task": "Wdrożenie nowej architektury na VPS, dodanie tokena PRESSAI_JWT_USER i konfiguracja crona",
+  "timestamp": "2026-09-06T17:27:00Z",
   "last_completed": [
     "Raport w sonic-void/inbox - commit e91278c2dd9d506173469375554423f8a14a7ff2",
     "Raport w media-dispatch - commit 7af253c4dec63d11d87635923b93c5a30c3f8116",
