@@ -82,7 +82,7 @@ CONFIG = {
     'portal': 'kurier365.pl',
     'pressai_url': os.environ.get('PRESSAI_URL', 'https://press.impresjapr.pl'),
     'feed_crawler_url': os.environ.get('FEED_CRAWLER_URL', 'https://crawler.impresjapr.pl'),
-    'spreadsheet_id': os.environ.get('SPREADSHEET_ID', '1HMuODAIOG8e_9VH-HitdL_TwBRwgFZ0vnSKAW7Wmyig'),
+    'spreadsheet_id': os.environ.get('SPREADSHEET_ID', '1zqwvS784EaZh1EJIcXk1DliAau1r4X15ENFJjloDSaM'),
     'state_file': str(Path(__file__).parent / 'kurier365_state.json'),
 
     # Token PressAI — uzupełnij przez docker exec lub secrets manager
@@ -167,8 +167,8 @@ def build_generate_payload(
 # GOOGLE SHEETS
 # ---------------------------------------------------------------------------
 
-def write_candidates_to_sheets(candidates: list, spreadsheet_id: str = '1HMuODAIOG8e_9VH-HitdL_TwBRwgFZ0vnSKAW7Wmyig') -> bool:
-    """Zapisuje kandydatów do zakładki Kandydaci w Google Sheets."""
+def write_candidates_to_sheets(candidates: list, spreadsheet_id: str = '1zqwvS784EaZh1EJIcXk1DliAau1r4X15ENFJjloDSaM') -> bool:
+    """Zapisuje kandydatów do zakładki Propozycje Radar w Google Sheets."""
     try:
         from google.oauth2.service_account import Credentials
         import gspread
@@ -188,29 +188,21 @@ def write_candidates_to_sheets(candidates: list, spreadsheet_id: str = '1HMuODAI
         )
         gc = gspread.authorize(creds)
         sh = gc.open_by_key(spreadsheet_id)
-        ws = sh.worksheet('Kandydaci')
+        ws = sh.worksheet('Propozycje Radar')
 
         now = datetime.now().strftime('%d.%m.%Y %H:%M')
         rows = []
         for c in candidates:
-            target_portal = _get_target_portal(c)
+            published_date = c.metadata.get('published', '') or now
             rows.append([
-                c.id,
-                now,
-                c.source,
-                target_portal,
-                c.metadata.get('category', ''),
-                f'P{max(0, 10-c.priority)}',
                 c.title,
-                (c.summary or '')[:200],
+                c.source,
                 c.content_url,
-                c.metadata.get('author', ''),
-                str(c.metadata.get('geo_relevance_score', '')),
-                'nowy',  # Status
-                '', '', '', '', '',  # puste pola M, N, O, P (WP URL), Q
-                c.metadata.get('geo_relevance', ''),  # R: Notatki
-                c.metadata.get('prompt_image_1', ''), # S: Prompt obraz 1
-                c.metadata.get('prompt_image_2', ''), # T: Prompt obraz 2
+                published_date,
+                "",
+                "",
+                "",
+                "Nowa Propozycja"
             ])
         if rows:
             ws.append_rows(rows, value_input_option='USER_ENTERED')
@@ -295,7 +287,7 @@ class Kurier365Worker(WorkerBase):
 
         self.pressai_url = effective_config['pressai_url'].rstrip('/')
         self.pressai_token = effective_config.get('pressai_token')
-        self.spreadsheet_id = effective_config.get('spreadsheet_id', '1HMuODAIOG8e_9VH-HitdL_TwBRwgFZ0vnSKAW7Wmyig')
+        self.spreadsheet_id = effective_config.get('spreadsheet_id', '1zqwvS784EaZh1EJIcXk1DliAau1r4X15ENFJjloDSaM')
         feed_crawler_url = effective_config.get('feed_crawler_url', 'https://crawler.impresjapr.pl')
         content_radar_jwt = effective_config.get('content_radar_jwt')
         content_radar_url = effective_config.get('content_radar_url', 'https://radar.impresjapr.pl')

@@ -138,13 +138,19 @@ def process_row_publish(row, row_idx, ws, pressai_token):
         print(f"  [BŁĄD] Generacja nie powiodła się: {r_gen.text[:200]}")
         return
         
-    # Parsowanie odpowiedzi JSON z generatora
-    try:
-        resp_json = r_gen.json()
-        generated_text = resp_json.get('result', {}).get('generated_article', '')
-    except Exception as e:
-        print(f"  [BŁĄD] Parsowanie JSON z generatora: {e}")
-        return
+    # Parsowanie odpowiedzi SSE z generatora
+    generated_text = ""
+    for line in r_gen.iter_lines():
+        if line:
+            line_str = line.decode('utf-8')
+            if line_str.startswith("data: "):
+                try:
+                    data = json.loads(line_str[6:])
+                    text = data.get('result', {}).get('generated_article', '')
+                    if text:
+                        generated_text = text
+                except Exception:
+                    pass
                 
     if not generated_text:
         print("  [BŁĄD] Pusty wynik z generatora.")
