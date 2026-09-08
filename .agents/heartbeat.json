@@ -1,10 +1,18 @@
 {
-  "callsign": "media-dev-30",
-  "status": "done",
-  "current_task": "Wdrożenie poprawek do skryptów radar_sheets_sync.py i emisja_sheets_sync.py",
-  "timestamp": "2026-09-06T20:30:00+02:00",
+  "callsign": "kurier-feed-dev-01",
+  "status": "working",
+  "current_task": "fix kategorii feedów w worker.py + dodanie --sheets do crontabu",
+  "timestamp": "2026-09-08T14:21:00+02:00",
   "last_completed": [
     "Hotfix: Radar & Emisja (autoryzacja, mapowanie, obrazki) - commit 419041c"
   ],
-  "pending": []
+  "pending": [
+    "Krok 0: Backup crontab i worker.py na VPS",
+    "Krok 1: Weryfikacja kategorii w Feed Crawler API",
+    "Krok 2: Pobranie aktualnego worker.py",
+    "Krok 3: Aktualizacja worker.py",
+    "Krok 4: Fix crontab na VPS",
+    "Krok 5: Deploy nowego kodu na VPS",
+    "Krok 6: Test dry run i raport końcowy"
+  ]
 }
