@@ -102,23 +102,41 @@ CONFIG = {
 # ---------------------------------------------------------------------------
 
 def _get_target_portal(candidate: ContentCandidate) -> str:
-    """Wybierz portal docelowy na podstawie sekcji/kategorii kandydata."""
-    section = candidate.metadata.get('section', '')
-    category = candidate.metadata.get('category', '')
+    """Wybierz portal docelowy na podstawie sekcji, portalu, kategorii lub treści kandydata."""
+    # 1. Sprawdź jawnie zadeklarowany portal na kandydacie (np. z BLOKU 2)
+    cand_portal = (candidate.portal or '').lower()
+    if 'biznesciti' in cand_portal:
+        return 'BiznesCiti'
+
+    section = candidate.metadata.get('section', '').lower()
+    category = candidate.metadata.get('category', '').lower()
+    departments = [d.lower() for d in candidate.metadata.get('departments', [])]
     source = candidate.source.lower()
 
-    # Gmail od współpracowników -> kurier365 (polityka, nauka, reportaż)
+    # 2. Gmail od współpracowników -> Kurier365
     if source.startswith('gmail:'):
         return 'Kurier365'
-    # Geostrategia/Obroność -> Kurier365
-    if 'geostrat' in section.lower() or 'defence' in section.lower():
+
+    # 3. Geostrategia / Obroność / Działy militarne -> Kurier365
+    if 'geostrat' in section or 'defence' in section or 'defence-geopolitics' in departments:
         return 'Kurier365'
-    # Nauka -> Kurier365
-    if 'nauka' in section.lower() or 'science' in category.lower():
+
+    # 4. Nauka / High-Tech -> Kurier365
+    if 'nauka' in section or 'science' in category or 'science-high-tech' in departments:
         return 'Kurier365'
-    # Biznes/gospodarka -> BiznesCiti
-    if any(kw in category.lower() for kw in ['biznes', 'gospodarka', 'finanse', 'ekonomia']):
+
+    # 5. Sprawdzenie słów kluczowych biznes/finanse w tytule, summary i kategorii
+    full_text = f"{candidate.title} {candidate.summary} {category}".lower()
+    biz_keywords = [
+        'biznes', 'gospodark', 'finans', 'ekonom', 'giełd', 'gield', 'gpw',
+        'akcje', 'obligacj', 'inflacj', 'stopy procentowe', 'nbp', 'ebc', 'fed',
+        'spółk', 'spolk', 'wyniki finansowe', 'fuzj', 'przejęc', 'przejec', 'ipo',
+        'startup', 'venture capital', 'inwestycj', 'nieruchomośc', 'nieruchomosc',
+        'podatk', 'vat', 'rynek pracy', 'przedsiębiorc', 'przedsiebiorc', 'isbnews'
+    ]
+    if any(kw in full_text for kw in biz_keywords):
         return 'BiznesCiti'
+
     return 'Kurier365'
 
 
@@ -352,7 +370,7 @@ class Kurier365Worker(WorkerBase):
         if not enabled_source or enabled_source == 'feedcrawler':
             self.add_source(FeedCrawlerSource(
                 api_url=feed_crawler_url,
-                portal='kurier365',
+                portal='BiznesCiti',  # POPRAWIONE z 'kurier365'
                 categories=['finanse', 'finans', 'gielda', 'giełda', 'gield', 'gpw', 'rynki', 'rynek', 'akcje', 'obligacje',
                             'ekonomia', 'inflacja', 'inflacj', 'stopy-procentowe', 'stopy procentowe', 'stopy', 'nbp', 'ebc', 'fed',
                             'spolki', 'spółki', 'spolk', 'spółk', 'wyniki-finansowe', 'wyniki finansowe', 'fuzje', 'przejecia', 'przejęcia', 'ipo',
