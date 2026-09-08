@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-\"\"\"agents/sheets-sync-worker/apply_kandydaci_formatting.py
+"""agents/sheets-sync-worker/apply_kandydaci_formatting.py
 
 Aktualizuje reguły Conditional Formatting dla zakładki Kandydaci w arkuszu Google Sheets.
 media-dispatch | media-dev-29 | 01.09.2026
@@ -14,7 +14,7 @@ Reguły:
 3. P1 (pomarańczowy): Kolumna F = 'P1'
 4. P2 (żółty): Kolumna F = 'P2'
 5. P3 (szary): Kolumna F = 'P3'
-\"\"\"
+"""
 
 import argparse
 import logging
@@ -42,7 +42,7 @@ def get_credentials(sa_path: Optional[str] = None):
     candidates = [
         sa_path,
         os.environ.get('GOOGLE_SA_FILE'),
-        '/home/ubuntu/otwock-data/muzeum/muzeum-drive-sa.json',
+        '/home/ubuntu/media-dispatch/config/service_account.json',
         'service_account.json',
         'credentials.json',
         'sa.json'
@@ -70,8 +70,7 @@ def build_rules(sheet_id: int, start_row: int = 1, end_row: int = 50, start_col:
     }
 
     rules_def = [
-        {
-            'name': 'Gmail Współpracownicy (złoty)',
+        {\n            'name': 'Gmail Współpracownicy (złoty)',
             'formula': '=REGEXMATCH(LOWER($C2), "gmail:")',
             'color': {'red': 1.0, 'green': 0.843, 'blue': 0.0}  # #FFD700
         },
