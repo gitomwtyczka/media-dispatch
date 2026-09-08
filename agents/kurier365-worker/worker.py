@@ -272,7 +272,11 @@ def update_candidate_in_sheets(
 
         row_idx = cell.row
         # Kolumna L = 12 (Status), Kolumna P = 16 (URL draftu WP), Kolumna Q = 17 (Collab link)
-        updates = [\n            {'range': f'L{row_idx}', 'values': [[status]]},\n            {'range': f'P{row_idx}', 'values': [[wp_url or '']]},\n            {'range': f'Q{row_idx}', 'values': [[collab_link or '']]},\n        ]
+        updates = [
+            {'range': f'L{row_idx}', 'values': [[status]]},
+            {'range': f'P{row_idx}', 'values': [[wp_url or '']]},
+            {'range': f'Q{row_idx}', 'values': [[collab_link or '']]},
+        ]
         ws.batch_update(updates, value_input_option='USER_ENTERED')
         log.info(f"Zaktualizowano wiersz {row_idx} w Sheets: Status='{status}', WP_URL='{wp_url}'")
         return True
