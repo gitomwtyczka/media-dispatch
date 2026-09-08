@@ -14,7 +14,7 @@ VPS         = "ubuntu@147.224.162.100"
 PORTAL_ID   = "2b047d7d-15a1-4d2f-8463-f89c2275bb73" # UUID for Prawy.pl
 SHEET_ID    = "1zqwvS784EaZh1EJIcXk1DliAau1r4X15ENFJjloDSaM"
 GID         = "809929940" # Zakładka Emisja
-SERVICE_ACC = r"C:\Users\tomas2\.gemini\antigravity\playground\media-dispatch\agents\sheets-sync-worker\service_account.json"
+SERVICE_ACC = os.environ.get('GOOGLE_SA_FILE', '/home/ubuntu/media-dispatch/config/service_account.json')
 
 # ===== TOKENS =====
 def get_jwt_token() -> str:
