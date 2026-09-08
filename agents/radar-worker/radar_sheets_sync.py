@@ -114,8 +114,12 @@ def process_row_publish(row, row_idx, ws, pressai_token):
         print("  [1] Extracting URL...")
         r_ext = requests.post(f"{PRESSAI_URL}/api/editor/extract", headers=auth_header(pressai_token), json={"url": url}, timeout=30)
         if r_ext.status_code == 200:
-            source_text = r_ext.json().get("content", url)
+            source_text = r_ext.json().get("content") or url
             
+    if not source_text:
+        print("  [BŁĄD] Brak source_text — pomijam wiersz.")
+        return
+
     # KROK 2: Generate w PressAI
     print("  [2] Generowanie artykułu...")
     payload = {
@@ -159,7 +163,7 @@ def process_row_publish(row, row_idx, ws, pressai_token):
     # KROK 3: Zapis do historii (Szkic w PressAI)
     print("  [3] Zapisywanie do historii PressAI...")
     r_save = requests.post(f"{PRESSAI_URL}/api/articles/", headers=auth_header(pressai_token), json={
-        "portal_id": PORTAL_ID,
+        "portal": PORTAL_ID,
         "content": generated_text,
         "title": tytul_seo,
         "status": "draft"
