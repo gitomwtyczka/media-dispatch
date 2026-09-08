@@ -1,14 +1,20 @@
 {
-  "callsign": "kurier-feed-dev-01",
+  "callsign": "Supervisor-04",
   "status": "done",
-  "current_task": "fix kategorii feedów w worker.py + dodanie --sheets do crontabu",
-  "timestamp": "2026-09-08T14:28:45+02:00",
+  "current_task": "media-dispatch sesja 4 — BiznesCiti routing, PressAI pipeline, parytet PL, crontab, JWT",
+  "timestamp": "2026-09-08T23:36:00+02:00",
   "last_completed": [
-    "Hotfix: Radar & Emisja (autoryzacja, mapowanie, obrazki) - commit 419041c",
-    "Rozszerzenie kategorii feedów Kurier365 i BiznesCiti (4 bloki) - commit 1be74738b6ff936baef5aa93ae358b94df15a6a3",
-    "Fix składni auth headers w worker.py - commit dc4dc4ecbfb73d8bef331f1f3c5640d170c42d24",
-    "Fix crontabu na VPS (dodano --sheets) i deploy na produkcji - 08.09.2026 14:27",
-    "Raport końcowy (dual-write: sonic-void inbox + media-dispatch) - commit 7328759"
+    "fix BiznesCiti routing Bug1+Bug2 — commit 3495860",
+    "fix PressAI kałubki (model Claude Sonnet + ekstrakcja text + custom_instructions) — 0dc3206 8750e91 8981f87",
+    "CONTENT_RADAR_JWT 30 dni + docker-compose fix — 15675f0",
+    "crontab SHELL=/bin/bash — live",
+    "data publikacji published_at — ff8e9b6",
+    "parytet PL: departments BLOK1+BLOK2 — c92f9d3",
+    "E2E: 7 artykułów PressAI (ID 659-666) wygenerowanych",
+    "E2E: 80 kandydatów BiznesCiti (WNP.pl, rp.pl) + 81 Kurier365"
   ],
-  "pending": []
+  "pending": [
+    "weryfikacja jakości artykułów 659-666 w PressAI (600+ słów, Claude Sonnet)",
+    "dropdown status w zakładkach per-portal (BiznesCiti, Kurier365)"
+  ]
 }
