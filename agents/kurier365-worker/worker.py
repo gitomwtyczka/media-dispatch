@@ -672,7 +672,8 @@ class Kurier365Worker(WorkerBase):
         generated = self.generate_article(candidate, target_portal)
         if not generated:
             log.error(f"Generowanie nie powiodło się dla kandydata {candidate.id}")
-            return {'status': 'error', 'candidate_id': candidate.id, 'error': 'Generation failed'}\n
+            return {'status': 'error', 'candidate_id': candidate.id, 'error': 'Generation failed'}
+
         # 2. Zapis do historii PressAI
         saved_article = self.save_article_history(candidate, generated, target_portal)
 
