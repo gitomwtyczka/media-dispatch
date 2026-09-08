@@ -308,36 +308,59 @@ class Kurier365Worker(WorkerBase):
             state_file='/tmp/gmail_state_kurier365.json'
         ))
 
-        # Feed Crawler — 13k+ źródeł RSS (UOKiK, PAP, Nauka, ISBNews, Biznes, etc.)
+        # BLOK 1: Kurier365 — wiadomości ogólne PL i świat
         if not enabled_source or enabled_source == 'feedcrawler':
             self.add_source(FeedCrawlerSource(
-            api_url=feed_crawler_url,
-            portal='kurier365',
-            categories=['prawo', 'konsument', 'uokik', 'gospodark', 'nauka', 'pap', 'biznes', 'finans', 'podatk', 'rynek', 'wnp', 'inflacj', 'cen', 'pols'],
-            hours_back=6,
-            limit=50,
-            state_file='/tmp/feed_crawler_state_kurier365.json'
-        ))
+                api_url=feed_crawler_url,
+                portal='kurier365',
+                categories=['polityka', 'polska', 'swiat', 'świat', 'pap', 'wybory', 'prawo', 'spoleczenstwo', 'społeczeństwo',
+                            'kultura', 'rozrywka', 'film', 'muzyka', 'sztuka',
+                            'zdrowie', 'medycyna', 'styl-zycia', 'styl życia', 'styl zycia', 'dieta', 'fitness',
+                            'podroze', 'podróże', 'turystyka', 'wakacje',
+                            'sport', 'pilka-nozna', 'pilka nozna', 'piłka nożna', 'piłka', 'pilka', 'tenis', 'koszykowka', 'koszykówka',
+                            'nauka', 'technologia', 'internet', 'ai', 'kosmonautyka',
+                            'motoryzacja', 'samochody', 'samochód', 'pols', 'ciekawostki'],
+                hours_back=6,
+                limit=60,
+                state_file='/tmp/feed_crawler_state_kurier365.json'
+            ))
 
-        # Dział NAUKA (Tier 1 Scientific + popularnonaukowe PL)
+        # BLOK 2: BiznesCiti — finanse i gospodarka głęboka
         if not enabled_source or enabled_source == 'feedcrawler':
             self.add_source(FeedCrawlerSource(
-            api_url=feed_crawler_url,
-            portal='kurier365',
-            departments=['science-high-tech', 'health-biotech'],
-            limit=20,
-            state_file='/tmp/fc_kurier365_science.json'
-        ))
+                api_url=feed_crawler_url,
+                portal='kurier365',
+                categories=['finanse', 'finans', 'gielda', 'giełda', 'gield', 'gpw', 'rynki', 'rynek', 'akcje', 'obligacje',
+                            'ekonomia', 'inflacja', 'inflacj', 'stopy-procentowe', 'stopy procentowe', 'stopy', 'nbp', 'ebc', 'fed',
+                            'spolki', 'spółki', 'spolk', 'spółk', 'wyniki-finansowe', 'wyniki finansowe', 'fuzje', 'przejecia', 'przejęcia', 'ipo',
+                            'startup', 'venture-capital', 'venture capital', 'inwestycje', 'inwestycj',
+                            'nieruchomosci', 'nieruchomości', 'esg', 'knf',
+                            'podatki', 'podatk', 'vat', 'rynek-pracy', 'rynek pracy', 'biznes', 'gospodarka', 'gospodark',
+                            'przedsiebiorcy', 'przedsiębiorcy', 'wnp', 'isbnews'],
+                hours_back=6,
+                limit=40,
+                state_file='/tmp/feed_crawler_state_biznesciti.json'
+            ))
 
-        # Geostrategia periodyczna (Chiny/Indie/Rosja + obrona)
+        # BLOK 3: Nauka i tech (był już wcześniej, zachowaj)
         if not enabled_source or enabled_source == 'feedcrawler':
             self.add_source(FeedCrawlerSource(
-            api_url=feed_crawler_url,
-            portal='kurier365',
-            departments=['defence-geopolitics'],
-            limit=10,
-            state_file='/tmp/fc_kurier365_geo.json'
-        ))
+                api_url=feed_crawler_url,
+                portal='kurier365',
+                departments=['science-high-tech', 'health-biotech'],
+                limit=20,
+                state_file='/tmp/fc_kurier365_science.json'
+            ))
+
+        # BLOK 4: Geopolityka (był już, zachowaj)
+        if not enabled_source or enabled_source == 'feedcrawler':
+            self.add_source(FeedCrawlerSource(
+                api_url=feed_crawler_url,
+                portal='kurier365',
+                departments=['defence-geopolitics'],
+                limit=10,
+                state_file='/tmp/fc_kurier365_geo.json'
+            ))
 
         # Newseria — agencja B2B z Eco-Bias Gate
         if not enabled_source or enabled_source == 'newseria':
@@ -373,7 +396,7 @@ class Kurier365Worker(WorkerBase):
 
     def _get_auth_headers(self) -> dict:
         token = self.pressai_token or os.environ.get('PRESSAI_JWT_USER') or os.environ.get('PRESSAI_JWT') or os.environ.get('PRESSAI_TOKEN')
-        headers = {'Content-Type': 'application/json'}
+        headers = {'Content-Type': 'application/json'}\
         if token:
             headers['Authorization'] = f'Bearer {token}'
         return headers
