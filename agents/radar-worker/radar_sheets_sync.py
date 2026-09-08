@@ -9,7 +9,7 @@ PRESSAI_URL = "https://press.impresjapr.pl"
 RADAR_URL   = "https://radar.impresjapr.pl"
 SHEET_ID    = "1zqwvS784EaZh1EJIcXk1DliAau1r4X15ENFJjloDSaM"
 TAB_NAME    = "Propozycje Radar"
-SERVICE_ACC = r"C:\Users\tomas2\.gemini\antigravity\playground\media-dispatch\agents\sheets-sync-worker\service_account.json"
+SERVICE_ACC = os.environ.get("GOOGLE_SA_KEY_PATH", "/home/ubuntu/otwock-data/muzeum/muzeum-drive-sa.json")
 SSH_KEY     = r"C:\Users\tomas2\.ssh\oracle-crimson.key"
 VPS         = "ubuntu@147.224.162.100"
 PORTAL_ID   = "2b047d7d-15a1-4d2f-8463-f89c2275bb73" # domyślnie prawy.pl
@@ -199,7 +199,7 @@ def process_row_publish(row, row_idx, ws, pressai_token):
         print(f"  [BŁĄD] Aktualizacja arkusza: {e}")
 
 def upload_wp_image(image_path: str, post_id):
-    path = Path(image_path.strip('\"\' '))
+    path = Path(image_path.strip('"\' '))
     if not path.exists():
         print(f"  [IMG] ERROR: Plik obrazka nie istnieje: {path}")
         return
@@ -221,14 +221,14 @@ def upload_wp_image(image_path: str, post_id):
         f"        filepath = '{remote_tmp}'\n"
         "        filename = os.path.basename(filepath)\n"
         "        with open(filepath, 'rb') as f: data = f.read()\n"
-        "        headers = {'Content-Disposition': f'attachment; filename=\"{{filename}}\"', 'Content-Type': 'image/jpeg'}\n"
-        f"        res = requests.post(f'{{wp_url}}/wp-json/wp/v2/media', auth=auth, headers=headers, data=data)\n"
+        "        headers = {'Content-Disposition': f'attachment; filename=\"{filename}\"', 'Content-Type': 'image/jpeg'}\n"
+        f"        res = requests.post(f'{wp_url}/wp-json/wp/v2/media', auth=auth, headers=headers, data=data)\n"
         "        if res.status_code in (200, 201):\n"
         "            media_id = res.json().get('id')\n"
-        f"            res2 = requests.post(f'{{wp_url}}/wp-json/wp/v2/posts/{post_id}', json={{'featured_media': media_id}}, auth=auth)\n"
-        "            print(f'MEDIA_OK: {{media_id}}')\n"
+        f"            res2 = requests.post(f'{wp_url}/wp-json/wp/v2/posts/{post_id}', json={{'featured_media': media_id}}, auth=auth)\n"
+        "            print(f'MEDIA_OK: {media_id}')\n"
         "        else:\n"
-        "            print(f'FAIL_MEDIA: {{res.status_code}} {{res.text[:100]}}')\n"
+        "            print(f'FAIL_MEDIA: {res.status_code} {res.text[:100]}')\n"
         "asyncio.run(main())\n"
     )
     cmd_ssh = ["ssh", "-i", SSH_KEY, "-o", "StrictHostKeyChecking=no", VPS, f"docker exec -w /app vse-api python3 -c {subprocess.list2cmdline([code])}"]
