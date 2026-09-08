@@ -396,7 +396,7 @@ class Kurier365Worker(WorkerBase):
 
     def _get_auth_headers(self) -> dict:
         token = self.pressai_token or os.environ.get('PRESSAI_JWT_USER') or os.environ.get('PRESSAI_JWT') or os.environ.get('PRESSAI_TOKEN')
-        headers = {'Content-Type': 'application/json'}\
+        headers = {'Content-Type': 'application/json'}
         if token:
             headers['Authorization'] = f'Bearer {token}'
         return headers
