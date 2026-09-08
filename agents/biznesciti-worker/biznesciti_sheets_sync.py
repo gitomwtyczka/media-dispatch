@@ -64,7 +64,7 @@ def process_row_publish(row, row_idx, ws, pressai_token):
             timeout=30
         )
         if r_ext.status_code == 200:
-            source_text = r_ext.json().get("content") or url
+            source_text = r_ext.json().get("text") or r_ext.json().get("content") or url
 
     if not source_text:
         print("  [BŁĄD] Brak source_text — pomijam wiersz.")
@@ -78,8 +78,18 @@ def process_row_publish(row, row_idx, ws, pressai_token):
         "target_portal": target,
         "selected_phrase": frazy,
         "seo_context": "",
+        "model_provider": "anthropic",
+        "model_name": "claude-sonnet-4-6",
         "formats": ["analiza", "feature"],
         "generate_faq": True,
+        "custom_instructions": (
+            "Artykuł musi mieć minimum 600 słów (optymalnie 800-1000 słów). "
+            "Tytuł SEO: chwytliwy, dziennikarski, z główną frazą kluczową w H1. "
+            "Język: polski, styl redakcyjny wysokiej jakości, zgodny z zasadami Google Discover. "
+            "Wzbogac o kontekst branżowy i powiązania rynkowe. "
+            "Sekcja FAQ na końcu: minimum 3 pytania i odpowiedzi. "
+            "Formatuj w czystym HTML z nagłówkami H2, H3, akapitami i listami."
+        ),
         "is_in_extenso": False,
         "image_metadata": []
     }
