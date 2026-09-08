@@ -1,18 +1,14 @@
 {
   "callsign": "kurier-feed-dev-01",
-  "status": "working",
+  "status": "done",
   "current_task": "fix kategorii feedów w worker.py + dodanie --sheets do crontabu",
-  "timestamp": "2026-09-08T14:21:00+02:00",
+  "timestamp": "2026-09-08T14:28:45+02:00",
   "last_completed": [
-    "Hotfix: Radar & Emisja (autoryzacja, mapowanie, obrazki) - commit 419041c"
+    "Hotfix: Radar & Emisja (autoryzacja, mapowanie, obrazki) - commit 419041c",
+    "Rozszerzenie kategorii feedów Kurier365 i BiznesCiti (4 bloki) - commit 1be74738b6ff936baef5aa93ae358b94df15a6a3",
+    "Fix składni auth headers w worker.py - commit dc4dc4ecbfb73d8bef331f1f3c5640d170c42d24",
+    "Fix crontabu na VPS (dodano --sheets) i deploy na produkcji - 08.09.2026 14:27",
+    "Raport końcowy (dual-write: sonic-void inbox + media-dispatch) - commit 7328759"
   ],
-  "pending": [
-    "Krok 0: Backup crontab i worker.py na VPS",
-    "Krok 1: Weryfikacja kategorii w Feed Crawler API",
-    "Krok 2: Pobranie aktualnego worker.py",
-    "Krok 3: Aktualizacja worker.py",
-    "Krok 4: Fix crontab na VPS",
-    "Krok 5: Deploy nowego kodu na VPS",
-    "Krok 6: Test dry run i raport końcowy"
-  ]
+  "pending": []
 }
