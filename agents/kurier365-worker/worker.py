@@ -233,7 +233,18 @@ def write_candidates_to_sheets(candidates: list, spreadsheet_id: str = '1zqwvS78
 
             rows = []
             for c in group:
-                published_date = c.metadata.get('published', '') or now
+                raw_date = c.metadata.get('published_at') or c.metadata.get('received_at')
+                if raw_date:
+                    try:
+                        if 'T' in str(raw_date):
+                            dt = datetime.fromisoformat(str(raw_date).replace('Z', '+00:00'))
+                            published_date = dt.strftime('%d.%m.%Y %H:%M')
+                        else:
+                            published_date = str(raw_date)
+                    except Exception:
+                        published_date = str(raw_date)
+                else:
+                    published_date = now
                 rows.append([
                     c.title,
                     c.source,
@@ -661,8 +672,7 @@ class Kurier365Worker(WorkerBase):
         generated = self.generate_article(candidate, target_portal)
         if not generated:
             log.error(f"Generowanie nie powiodło się dla kandydata {candidate.id}")
-            return {'status': 'error', 'candidate_id': candidate.id, 'error': 'Generation failed'}
-
+            return {'status': 'error', 'candidate_id': candidate.id, 'error': 'Generation failed'}\n
         # 2. Zapis do historii PressAI
         saved_article = self.save_article_history(candidate, generated, target_portal)
 
