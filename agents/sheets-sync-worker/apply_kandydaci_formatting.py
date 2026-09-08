@@ -70,7 +70,8 @@ def build_rules(sheet_id: int, start_row: int = 1, end_row: int = 50, start_col:
     }
 
     rules_def = [
-        {\n            'name': 'Gmail Współpracownicy (złoty)',
+        {
+            'name': 'Gmail Współpracownicy (złoty)',
             'formula': '=REGEXMATCH(LOWER($C2), "gmail:")',
             'color': {'red': 1.0, 'green': 0.843, 'blue': 0.0}  # #FFD700
         },
