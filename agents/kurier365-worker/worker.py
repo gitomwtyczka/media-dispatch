@@ -168,7 +168,9 @@ def build_generate_payload(
 # ---------------------------------------------------------------------------
 
 def write_candidates_to_sheets(candidates: list, spreadsheet_id: str = '1zqwvS784EaZh1EJIcXk1DliAau1r4X15ENFJjloDSaM') -> bool:
-    """Zapisuje kandydatów do zakładki Propozycje Radar w Google Sheets."""
+    """Zapisuje kandydatów do właściwych zakładek w Google Sheets.
+    Routing: Kurier365 → 'Propozycje Kurier365', BiznesCiti → 'Propozycje BiznesCiti'.
+    """
     try:
         from google.oauth2.service_account import Credentials
         import gspread
@@ -176,7 +178,7 @@ def write_candidates_to_sheets(candidates: list, spreadsheet_id: str = '1zqwvS78
         log.warning("Brak bibliotek google-auth / gspread — pomijam zapis do Sheets")
         return False
 
-    sa_file = os.getenv('GOOGLE_SA_FILE', '/home/ubuntu/otwock-data/muzeum/muzeum-drive-sa.json')
+    sa_file = os.getenv('GOOGLE_SA_FILE', '/home/ubuntu/media-dispatch/config/service_account.json')
     if not os.path.exists(sa_file):
         log.warning(f"Brak pliku service account ({sa_file}) — pomijam zapis do Sheets")
         return False
@@ -188,26 +190,47 @@ def write_candidates_to_sheets(candidates: list, spreadsheet_id: str = '1zqwvS78
         )
         gc = gspread.authorize(creds)
         sh = gc.open_by_key(spreadsheet_id)
-        ws = sh.worksheet('Propozycje Radar')
+
+        tab_mapping = {
+            'BiznesCiti': 'Propozycje BiznesCiti',
+            'Kurier365': 'Propozycje Kurier365',
+        }
+
+        # Grupuj kandydatów per zakładka
+        groups: dict = {}
+        for c in candidates:
+            portal = _get_target_portal(c)
+            tab = tab_mapping.get(portal, 'Propozycje Kurier365')
+            groups.setdefault(tab, []).append(c)
 
         now = datetime.now().strftime('%d.%m.%Y %H:%M')
-        rows = []
-        for c in candidates:
-            published_date = c.metadata.get('published', '') or now
-            rows.append([
-                c.title,
-                c.source,
-                c.content_url,
-                published_date,
-                "",
-                "",
-                "",
-                "Nowa Propozycja"
-            ])
-        if rows:
-            ws.append_rows(rows, value_input_option='USER_ENTERED')
-            log.info(f'Zapisano {len(rows)} kandydatów do Sheets')
-        return True
+        total = 0
+        for tab_name, group in groups.items():
+            try:
+                ws = sh.worksheet(tab_name)
+            except Exception:
+                log.info(f"Tworzę nową zakładkę '{tab_name}'")
+                ws = sh.add_worksheet(title=tab_name, rows='100', cols='8')
+                ws.update('A1:H1', [["Temat", "Źródło", "Link do źródła", "Data opublikowania źródła", "Tytuł SEO", "Frazy kluczowe", "Obrazek główny", "Status"]])
+
+            rows = []
+            for c in group:
+                published_date = c.metadata.get('published', '') or now
+                rows.append([
+                    c.title,
+                    c.source,
+                    c.content_url,
+                    published_date,
+                    "",
+                    "",
+                    "",
+                    "Nowa Propozycja"
+                ])
+            if rows:
+                ws.append_rows(rows, value_input_option='USER_ENTERED')
+                log.info(f"Zapisano {len(rows)} kandydatów do zakładki '{tab_name}'")
+                total += len(rows)
+        return total > 0
     except Exception as e:
         log.error(f'Błąd zapisu do Sheets: {e}')
         return False
@@ -228,7 +251,7 @@ def update_candidate_in_sheets(
         log.warning("Brak bibliotek google-auth / gspread — pomijam aktualizację Sheets")
         return False
 
-    sa_file = os.getenv('GOOGLE_SA_FILE', '/home/ubuntu/otwock-data/muzeum/muzeum-drive-sa.json')
+    sa_file = os.getenv('GOOGLE_SA_FILE', '/home/ubuntu/media-dispatch/config/service_account.json')
     if not os.path.exists(sa_file):
         log.warning(f"Brak pliku service account ({sa_file}) — pomijam aktualizację Sheets")
         return False
@@ -249,11 +272,7 @@ def update_candidate_in_sheets(
 
         row_idx = cell.row
         # Kolumna L = 12 (Status), Kolumna P = 16 (URL draftu WP), Kolumna Q = 17 (Collab link)
-        updates = [
-            {'range': f'L{row_idx}', 'values': [[status]]},
-            {'range': f'P{row_idx}', 'values': [[wp_url or '']]},
-            {'range': f'Q{row_idx}', 'values': [[collab_link or '']]},
-        ]
+        updates = [\n            {'range': f'L{row_idx}', 'values': [[status]]},\n            {'range': f'P{row_idx}', 'values': [[wp_url or '']]},\n            {'range': f'Q{row_idx}', 'values': [[collab_link or '']]},\n        ]
         ws.batch_update(updates, value_input_option='USER_ENTERED')
         log.info(f"Zaktualizowano wiersz {row_idx} w Sheets: Status='{status}', WP_URL='{wp_url}'")
         return True
@@ -720,7 +739,7 @@ Zmienne środowiskowe:
             print(f"Discord Webhook: {'SET (✅ LIVE)' if discord_url else 'NOT SET (⚠️ discord disabled)'}")
             priority_url = os.environ.get('DISCORD_WEBHOOK_PRIORITY')
             print(f"Discord Priority Webhook: {'SET (✅ LIVE)' if priority_url else 'NOT SET'}")
-            sa_file = os.environ.get('GOOGLE_SA_FILE', '/home/ubuntu/otwock-data/muzeum/muzeum-drive-sa.json')
+            sa_file = os.environ.get('GOOGLE_SA_FILE', '/home/ubuntu/media-dispatch/config/service_account.json')
             sa_ok = os.path.exists(sa_file)
             print(f"Google SA File: {'SET (✅ FOUND)' if sa_ok else f'NOT FOUND ({sa_file})'}")
         return
