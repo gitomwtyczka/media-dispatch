@@ -365,6 +365,7 @@ class Kurier365Worker(WorkerBase):
             self.add_source(FeedCrawlerSource(
                 api_url=feed_crawler_url,
                 portal='kurier365',
+                departments=['media-polskie', 'agencje-prasowe', 'konkurencja-ogolne-lifestyle'],
                 categories=['polityka', 'polska', 'swiat', 'świat', 'pap', 'wybory', 'prawo', 'spoleczenstwo', 'społeczeństwo',
                             'kultura', 'rozrywka', 'film', 'muzyka', 'sztuka',
                             'zdrowie', 'medycyna', 'styl-zycia', 'styl życia', 'styl zycia', 'dieta', 'fitness',
@@ -382,6 +383,7 @@ class Kurier365Worker(WorkerBase):
             self.add_source(FeedCrawlerSource(
                 api_url=feed_crawler_url,
                 portal='BiznesCiti',  # POPRAWIONE z 'kurier365'
+                departments=['konkurencja-biznes', 'economy-global-trade'],
                 categories=['finanse', 'finans', 'gielda', 'giełda', 'gield', 'gpw', 'rynki', 'rynek', 'akcje', 'obligacje',
                             'ekonomia', 'inflacja', 'inflacj', 'stopy-procentowe', 'stopy procentowe', 'stopy', 'nbp', 'ebc', 'fed',
                             'spolki', 'spółki', 'spolk', 'spółk', 'wyniki-finansowe', 'wyniki finansowe', 'fuzje', 'przejecia', 'przejęcia', 'ipo',
