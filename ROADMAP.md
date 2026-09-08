@@ -1,5 +1,5 @@
-# media-dispatch — ROADMAP v2.0
-*Zaktualizowany: 2026-09-08 | Supervisor 03*
+# media-dispatch — ROADMAP v2.1
+*Zaktualizowany: 2026-09-08 18:09 CEST | Supervisor 03*
 
 ---
 
@@ -15,98 +15,94 @@ media-dispatch to Content Operating System — system AI który bez ręcznej pra
 SWIAT → WYWIAD → REDAKTOR NACZELNY → PRODUCENT → PORTAL
 ```
 
-### Warstwa 1 — Wywiad (Intelligence)
-Automatycznie zbiera i ocenia tematy:
-- **Feed Crawler** (`crawler.impresjapr.pl`) — 13 000+ RSS feedów, świat i Polska
-- **Content Radar** (`radar.impresjapr.pl`) — trendy social media (Twitter/X, YT, TikTok, Google Trends)
-- **Gmail P0** — wiadomości od współpracowników (Rudiński, Binćzyk, Żabka i in.)
-- **GeoRelevanceSignal** — ważność PL/EU/Global
+### Warstwa 1 — Wywiad
+- **Feed Crawler** (`crawler.impresjapr.pl`) — 13 000+ RSS feedów — ✅ LIVE
+- **Content Radar** (`radar.impresjapr.pl`) — trendy social media — ✅ LIVE (wymaga CONTENT_RADAR_JWT)
+- **Gmail P0** — wiadomości od współpracowników — ✅ LIVE
+- **GeoRelevanceSignal** — ważność PL/EU/Global — ✅ LIVE
 
-### Warstwa 2 — Redaktor Naczelny (Editorial AI)
-Meta-agent który:
-1. Zbiera raporty od wywiadu
-2. Segreguje propozycje per portal (prawy.pl / kurier365.pl / biznesciti.com)
-3. Wrzuca do Google Sheets (zakładka per portal)
-4. Po zatwierdzeniu przez użytkownika → dispatch do producenta
+### Warstwa 2 — Google Sheets (Human-in-the-Loop)
+Arkusz ID: `1zqwvS784EaZh1EJIcXk1DliAau1r4X15ENFJjloDSaM`
 
-### Warstwa 3 — Producenci
-- **PressAI** (`press.impresjapr.pl`) — generuje artykuły tekstowe → WP Draft
-- **VSE** (`vse.impresjapr.pl`) — przetwarza video YouTube → WP Draft + opis YT
+| Zakładka | Portal | Worker (cron) | Status |
+|----------|--------|---------------|--------|
+| Emisja | prawy.pl | emisja_sheets_sync.py (co godz. :00) | ✅ LIVE |
+| Propozycje Radar | prawy.pl | radar_sheets_sync.py (co godz. :30) | ✅ LIVE |
+| Propozycje Kurier365 | kurier365.pl | kurier365_sheets_sync.py (co godz. :15) | ✅ LIVE |
+| Propozycje BiznesCiti | biznesciti.com | biznesciti_sheets_sync.py (co godz. :45) | ✅ LIVE |
+| Biblia | prawy.pl | ręczny (biblia_full_pipeline.py) | ✅ standalone |
+| Shorty | prawy.pl | ręczny (process_shorts_describe.py) | ✅ standalone |
+| Kandydaci YT | prawy.pl | prawy-youtube-worker | 🔴 planowane |
 
-### Workers samodzielne (poza orkiestracją Redaktora)
-- `prawy-studio-worker` — video Studio Prawy_PL (standalone)
-- `prawy-youtube-worker` — kanał YT Studio Prawy_PL (standalone)
-- `biblia-worker` — [do potwierdzenia]
-
----
-
-## Google Sheets — przepływ propozycji
-
-Arkusz: `1zqwvS784EaZh1EJIcXk1DliAau1r4X15ENFJjloDSaM`
-
-| Zakładka | Portal | Sync script (cron) |
-|----------|--------|--------------------|
-| Propozycje Radar | prawy.pl | `radar_sheets_sync.py` (:30 co godz.) |
-| Propozycje Kurier365 | kurier365.pl | `kurier365_sheets_sync.py` (:15 co godz.) |
-| Propozycje BiznesCiti | biznesciti.com | `biznesciti_sheets_sync.py` (:45 co godz.) |
-
-**Sposób działania:**
-1. Propozycje lądują automatycznie (feed-crawler) lub manualnie
+**Przepływ:**
+1. Propozycje lądują automatycznie (feed-crawler co 6h) lub manualnie
 2. Użytkownik wpisuje `Publikuj w PressAI` lub `Publikuj VSE` w kolumnie Status
 3. Skrypt sync generuje artykuł przez PressAI lub video przez VSE → WP Draft
 
+### Warstwa 3 — Producenci
+- **PressAI** (`press.impresjapr.pl`) — artykuły tekstowe → WP Draft — ✅ LIVE
+- **VSE** (`vse.impresjapr.pl`) — video YouTube → WP Draft + opis YT — ✅ LIVE
+
+### Standalone Workers (nie przez orkiestrację)
+- `prawy-studio-worker` — video Studio Prawy_PL (VSE pipeline) — ✅ MVP v1.0
+- `prawy-youtube-worker` — monitoring kanału YT — ✅ v1.0 skeleton
+- `agents/vse-worker/scripts/biblia_*.py` — Prawy Biblijny (audio → VSE) — ✅ standalone
+
 ---
 
-## Stan wdrożenia (08.09.2026)
+## Stan wdrożenia (08.09.2026 18:00 CEST)
 
-### DZIAŁA ✅
-- Feed Crawler source (FeedCrawlerSource) — 13k+ RSS
-- Gmail source (GmailSource) — priorytet P0
-- GeoRelevanceSignal — ważność geograficzna
-- ContentRadarSignal — żywy gdy CONTENT_RADAR_JWT ustawiony
-- `kurier365-worker` — zbieranie kandydatów, routing do Sheets
-- `prawy-studio-worker` — standalone, video
-- `prawy-youtube-worker` — standalone, YT
-- Google Sheets — 3 zakładki propozycji (wdrożone 08.09.2026)
-- Sheets → PressAI sync — artykuły generowane automatycznie (wdrożone 08.09.2026)
-- Portal UUIDs w `.env`: KURIER365_PORTAL_ID, BIZNESCITI_PORTAL_ID (wdrożone 08.09.2026)
+### ✅ DZIAŁA
+- Feed Crawler source — 13k+ RSS, zbiera kandydatów
+- Gmail source — priorytet P0, współpracownicy
+- GeoRelevanceSignal — scoring ważności
+- ContentRadarSignal — aktywny po podaniu CONTENT_RADAR_JWT
+- `kurier365-worker` — zbieranie + routing do Sheets (cron co 6h)
+- Google Sheets — 6 zakładek, sync scripts dla 3 portali
+- Sheets → PressAI sync — artykuły na żądanie (cron co godz.)
+- SA `media-dispatch-sheets@...` — autoryzacja Sheets → VPS
+- Portal UUIDs: KURIER365_PORTAL_ID, BIZNESCITI_PORTAL_ID (w .env)
+- `prawy-studio-worker` — standalone, VSE pipeline z checkpointing
+- `prawy-youtube-worker` — standalone, monitoring kanału
+- Biblia scripts — standalone, pelny audio → VSE pipeline
 
-### DO ZBUDOWANIA 🔴
+### 🔴 DO ZBUDOWANIA (priorytety)
 
 **PRIORYTET 1: Detekcja video w Sheets sync**
-- Jeśli URL = YouTube (`youtube.com` / `youtu.be`) → VSE zamiast PressAI
-- Dotyczy: `radar_sheets_sync.py`, `kurier365_sheets_sync.py`, `biznesciti_sheets_sync.py`
+Dodanie obsługi `Publikuj VSE` w radar/kurier365/biznesciti sync scripts.
+Wzór: `emisja_sheets_sync.py` (YT URL → VSE pipeline).
 
-**PRIORYTET 2: Redaktor Naczelny MVP**
-- Agent który co godzinę bierze top kandydatów z feed-crawlera + Content Radaru
-- Wrzuca propozycje do właściwej zakładki Sheets automatycznie
-- Routing: biznes/gospodarka → BiznesCiti, nauka/geopolityka → Kurier365, polityka/KK → prawy
-- Po zatwierdzeniu przez użytkownika → dispatch do PressAI lub VSE
+**PRIORYTET 2: CONTENT_RADAR_JWT**
+Pobrać token z panelu `radar.impresjapr.pl` → dodać do `.env`.
+Efekt: trendy social media zasilają scoring kandydatów.
 
-**PRIORYTET 3: CONTENT_RADAR_JWT**
-- Pobrać token z panelu `radar.impresjapr.pl`
-- Dodać do `.env` na VPS
-- Efekt: trendy social media zaczną automatycznie wpływać na scoring kandydatów
+**PRIORYTET 3: Biblia worker — przeniesienie do repo**
+`agents/vse-worker/scripts/biblia_*.py` istnieje tylko lokalnie.
+Należy dodać jako `agents/biblia-worker/` do repo GitHub.
 
-**PRIORYTET 4: pressai-worker (ujednolicony)**
-- Refaktor 3 osobnych skryptów sync do jednego modułu w `agents/pressai-worker/`
-- Niższy priorytet — funkcjonalnie działa już w obecnej formie
+**PRIORYTET 4: Redaktor Naczelny MVP**
+Agent który co godzinę bierze top kandydatów z feed-crawlera + Content Radaru
+i wrzuca do właściwej zakładki Sheets automatycznie.
+Routing: biznes → BiznesCiti, nauka/geopolityka → Kurier365, polityka/KK → prawy
+
+**PRIORYTET 5: shorts-agent (implementation)**
+Spec gotowa, zero kodu. Shorts Machine API dostępne od 31.08.2026.
 
 **ODROCZONE:**
 - Discord Editorial Center (Faza 3)
-- shorts-agent + TikTok worker (Faza 6)
+- TikTok worker (Faza 6)
 - Multi-platform distribution (Faza 6)
 
 ---
 
-## Crontab VPS (aktualny stan)
+## Crontab VPS (aktualny — 08.09.2026)
 
 ```bash
-0  */6 * * *  kurier365-worker/worker.py --run --sheets    # zbieranie kandydatów
-0  * * * *    emisja_sheets_sync.py                        # Emisja zakładka
-30 * * * *    radar_sheets_sync.py                         # Radar → prawy.pl
-15 * * * *    kurier365_sheets_sync.py                     # Kurier365 sync
-45 * * * *    biznesciti_sheets_sync.py                    # BiznesCiti sync
+0  */6 * * *  kurier365-worker/worker.py --run --sheets   # zbieranie + Sheets
+0  * * * *    emisja_sheets_sync.py                       # Emisja → VSE
+30 * * * *    radar_sheets_sync.py                        # Radar → PressAI prawy.pl
+15 * * * *    kurier365_sheets_sync.py                    # Kurier365 → PressAI
+45 * * * *    biznesciti_sheets_sync.py                   # BiznesCiti → PressAI
 ```
 
 ---
@@ -118,6 +114,14 @@ Arkusz: `1zqwvS784EaZh1EJIcXk1DliAau1r4X15ENFJjloDSaM`
 | prawy.pl | `2b047d7d-15a1-4d2f-8463-f89c2275bb73` |
 | kurier365.pl | `dc49d944-188a-4e64-8465-f0a5d6a0221a` |
 | biznesciti.com | `3bf77e55-26ba-4f0b-b7dc-a79d91d2f4b1` |
+
+---
+
+## Service Account
+
+- SA email: `media-dispatch-sheets@antigravity-mcp-keys.iam.gserviceaccount.com`
+- SA path VPS: `/home/ubuntu/media-dispatch/config/service_account.json`
+- Env var: `GOOGLE_SA_FILE`
 
 ---
 
@@ -138,7 +142,12 @@ Arkusz: `1zqwvS784EaZh1EJIcXk1DliAau1r4X15ENFJjloDSaM`
 ```
 
 ### Agent interface
-Każdy worker musi implementować:
-- `health_check()` → bool
-- `process(task)` → result
-- `get_status()` → WorkerStatus
+```python
+def health_check() -> bool
+def process(task) -> result
+def get_status() -> WorkerStatus
+```
+
+---
+
+*[Supervisor 03 | sonic-void 08.09.2026] — ROADMAP v2.1 — pełny stan po sesji 3*
