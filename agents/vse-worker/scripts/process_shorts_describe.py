@@ -2,10 +2,11 @@
 """
 process_shorts_describe.py — media-dispatch / VSE Short Machine integration
 
-Przetwarzanie 8 shortów przez endpoint POST /v1/shorts/describe:
+Przetwarzanie 7 shortów przez endpoint POST /v1/shorts/describe:
 - Generowanie JWT tokenu z bazy/ENV VSE
 - Pobranie i odświeżenie tokenów YouTube z bazy danych VSE
-- POST /v1/shorts/describe z youtube_id i portal_id
+- Pobranie napisów VTT z YouTube API do /tmp/{id}.vtt jeśli brak
+- POST /v1/shorts/describe z youtube_id, portal_id, start_sec, end_sec
 - Aktualizacja metadanych na YouTube (optimized_title, description, hashtags)
 - Dodanie przypiętego komentarza (pinned_comment)
 - Zapis wyników do /tmp/shorts_described.json
@@ -71,6 +72,28 @@ async def get_yt_channels():
                 print(f"[WARN] Failed to refresh creds for channel {ch.title}: {e}")
     return channels
 
+def ensure_vtt_exists(channels, video_id):
+    vtt_path = f"/tmp/{video_id}.vtt"
+    if os.path.exists(vtt_path) and os.path.getsize(vtt_path) > 0:
+        return True
+    for ch in channels:
+        try:
+            youtube = build("youtube", "v3", credentials=ch["creds"])
+            c_resp = youtube.captions().list(part="snippet", videoId=video_id).execute()
+            items = c_resp.get("items", [])
+            if not items:
+                continue
+            cap_id = items[0]["id"]
+            req = youtube.captions().download(id=cap_id, tfmt="vtt")
+            content = req.execute()
+            with open(vtt_path, "wb") as f:
+                f.write(content)
+            print(f"Auto-downloaded VTT for {video_id} -> {vtt_path} ({len(content)} bytes)")
+            return True
+        except Exception as e:
+            print(f"Could not download VTT for {video_id} from {ch['title']}: {e}")
+    return False
+
 def describe_short(token, youtube_id):
     url = f"{VSE_BASE}/v1/shorts/describe"
     headers = {
@@ -79,7 +102,9 @@ def describe_short(token, youtube_id):
     }
     payload = {
         "youtube_id": youtube_id,
-        "portal_id": PORTAL_ID
+        "portal_id": PORTAL_ID,
+        "start_sec": 0.0,
+        "end_sec": 300.0
     }
     print(f"Calling {url} for {youtube_id}...")
     try:
@@ -190,6 +215,7 @@ async def main():
         print(f"Processing Short: {yt_id} ({slot})")
         print(f"==========================================")
 
+        ensure_vtt_exists(channels, yt_id)
         desc_res = describe_short(token, yt_id)
         
         opt_title = desc_res.get("optimized_title") or desc_res.get("title") or ""
