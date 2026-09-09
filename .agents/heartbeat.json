@@ -1,20 +1,13 @@
 {
-  "callsign": "Supervisor-04",
+  "callsign": "shorts-worker-01",
   "status": "done",
-  "current_task": "media-dispatch sesja 4 — BiznesCiti routing, PressAI pipeline, parytet PL, crontab, JWT",
-  "timestamp": "2026-09-08T23:36:00+02:00",
+  "current_task": "Shorts SEO + Harmonogram 09.09.2026",
+  "timestamp": "2026-09-10T00:13:00+02:00",
   "last_completed": [
-    "fix BiznesCiti routing Bug1+Bug2 — commit 3495860",
-    "fix PressAI kałubki (model Claude Sonnet + ekstrakcja text + custom_instructions) — 0dc3206 8750e91 8981f87",
-    "CONTENT_RADAR_JWT 30 dni + docker-compose fix — 15675f0",
-    "crontab SHELL=/bin/bash — live",
-    "data publikacji published_at — ff8e9b6",
-    "parytet PL: departments BLOK1+BLOK2 — c92f9d3",
-    "E2E: 7 artykułów PressAI (ID 659-666) wygenerowanych",
-    "E2E: 80 kandydatów BiznesCiti (WNP.pl, rp.pl) + 81 Kurier365"
+    "process_shorts_describe.py update with start_sec/end_sec & auto-VTT — commit 13a74b4",
+    "Shorts describe & YouTube metadata update (7/7 shortów zoptymalizowanych na kanale Studio Prawy_PL)",
+    "Shorts scheduling via YouTube Data API v3 (6 prywatnych shortów z ustawionym publishAt)",
+    "Report dual-write — commit be899cb (media-dispatch) i 7c95edb (sonic-void)"
   ],
-  "pending": [
-    "weryfikacja jakości artykułów 659-666 w PressAI (600+ słów, Claude Sonnet)",
-    "dropdown status w zakładkach per-portal (BiznesCiti, Kurier365)"
-  ]
+  "pending": []
 }
