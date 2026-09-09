@@ -1,13 +1,15 @@
 {
-  "callsign": "shorts-worker-01",
+  "callsign": "shorts-worker-03",
   "status": "done",
-  "current_task": "Shorts SEO + Harmonogram 09.09.2026",
-  "timestamp": "2026-09-10T00:13:00+02:00",
+  "current_task": "Shorts runda 3: 2 private + 5 public",
+  "timestamp": "2026-09-10T01:41:00+02:00",
   "last_completed": [
-    "process_shorts_describe.py update with start_sec/end_sec & auto-VTT — commit 13a74b4",
-    "Shorts describe & YouTube metadata update (7/7 shortów zoptymalizowanych na kanale Studio Prawy_PL)",
-    "Shorts scheduling via YouTube Data API v3 (6 prywatnych shortów z ustawionym publishAt)",
-    "Report dual-write — commit be899cb (media-dispatch) i 7c95edb (sonic-void)"
+    "XBhI8nXMpeg (Ossowski) describe & scheduled for 12.09 18:00 CEST on Studio Prawy_PL",
+    "Local transcript pipeline & VTT generation for 5 public shorts + VSE describe metadata generated for all 7 shorts",
+    "vse-api:/app/apply_shorts_r3_yt.py & /tmp/shorts_r3_results.json deployed for post-quota execution",
+    "Report dual-write — e7e7a13 (media-dispatch) & 78d4e01 (sonic-void)"
   ],
-  "pending": []
+  "pending": [
+    "Run apply_shorts_r3_yt.py after 09:00 CEST YouTube API quota reset to push remaining 6 snippets"
+  ]
 }
