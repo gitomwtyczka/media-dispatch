@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 """
-process_shorts_describe.py — media-dispatch / VSE Short Machine integration
+process_shorts_describe.py — media-dispatch / VSE Short Machine integration (Runda 2)
 
-Przetwarzanie 7 shortów przez endpoint POST /v1/shorts/describe:
+Przetwarzanie 4 shortów przez endpoint POST /v1/shorts/describe:
 - Generowanie JWT tokenu z bazy/ENV VSE
 - Pobranie i odświeżenie tokenów YouTube z bazy danych VSE
-- Pobranie napisów VTT z YouTube API do /tmp/{id}.vtt jeśli brak
+- Pobranie napisów VTT z YouTube API do /tmp/{id}.vtt jeśli brak (z retry na ASR)
 - POST /v1/shorts/describe z youtube_id, portal_id, start_sec, end_sec
-- Aktualizacja metadanych na YouTube (optimized_title, description, hashtags)
+- Aktualizacja metadanych na YouTube (optimized_title, description bez duplikatów hashtagów)
 - Dodanie przypiętego komentarza (pinned_comment)
 - Zapis wyników do /tmp/shorts_described.json
 
 Uruchomienie wewnątrz kontenera vse-api:
-  docker cp process_shorts_describe.py vse-api:/app/process_shorts_describe.py
+  docker cp agents/vse-worker/scripts/process_shorts_describe.py vse-api:/app/process_shorts_describe.py
   docker exec -w /app vse-api python3 /app/process_shorts_describe.py
 """
 
 import os
+import re
 import json
 import time
 import datetime
@@ -33,13 +34,10 @@ from api.models.youtube_channel import YouTubeChannel
 from api.core.youtube_publish import _build_credentials
 
 SHORTS = [
-    {"id": "lX2vvs8E-AY", "slot": "public — fix opisu"},
-    {"id": "G0EE5lM7TkE", "slot": "10.09 07:00 CEST"},
-    {"id": "b-2j28LueLc", "slot": "10.09 12:00 CEST"},
-    {"id": "NpmUYF66MEQ", "slot": "10.09 18:00 CEST"},
-    {"id": "2Y3S5oUtcvQ", "slot": "10.09 21:00 CEST"},
-    {"id": "aXKRv8RzlxE", "slot": "11.09 07:00 CEST"},
-    {"id": "T4YtG2fDhQk", "slot": "11.09 12:00 CEST"},
+    {"id": "vjb6-hLwvcw", "slot": "11.09 18:00 CEST"},
+    {"id": "5CyknO8U6ps", "slot": "11.09 21:00 CEST"},
+    {"id": "36Hx7xaoz9c", "slot": "12.09 07:00 CEST"},
+    {"id": "bi-bZUyNLxI", "slot": "12.09 12:00 CEST"},
 ]
 
 PORTAL_ID = "2b047d7d-15a1-4d2f-8463-f89c2275bb73"
@@ -118,6 +116,25 @@ def describe_short(token, youtube_id):
         print(f"Exception calling describe: {e}")
         return {"error": str(e)}
 
+def deduplicate_description(desc: str) -> str:
+    seen = set()
+    pattern = re.compile(r'#[A-Za-z0-9_ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+')
+    lines = desc.split('\n')
+    new_lines = []
+    for line in lines:
+        def repl(m):
+            tag = m.group(0)
+            tag_lower = tag.lower()
+            if tag_lower in seen:
+                return ""
+            seen.add(tag_lower)
+            return tag
+        new_line = pattern.sub(repl, line)
+        new_line = re.sub(r'[ \t]+', ' ', new_line).strip()
+        new_lines.append(new_line)
+    res = '\n'.join(new_lines)
+    return re.sub(r'\n{3,}', '\n\n', res).strip()
+
 def update_youtube_video(channels, video_id, title, description, hashtags):
     tags_formatted = []
     if isinstance(hashtags, list):
@@ -126,15 +143,17 @@ def update_youtube_video(channels, video_id, title, description, hashtags):
             if not h_clean.startswith("#"):
                 h_clean = f"#{h_clean}"
             tags_formatted.append(h_clean)
-        tags_str = " ".join(tags_formatted)
     elif isinstance(hashtags, str):
-        tags_str = hashtags
-    else:
-        tags_str = ""
+        tags_formatted = [h.strip() for h in hashtags.split() if h.strip()]
+
+    desc_lower = description.lower()
+    new_tags = [h for h in tags_formatted if h.lower() not in desc_lower]
 
     full_description = description
-    if tags_str and tags_str not in full_description:
-        full_description = f"{full_description}\n\n{tags_str}"
+    if new_tags:
+        full_description = f"{full_description}\n\n{' '.join(new_tags)}"
+
+    full_description = deduplicate_description(full_description)
 
     print(f"\n--- Updating YT Video {video_id} ---")
     print(f"Title: {title}")
@@ -160,7 +179,7 @@ def update_youtube_video(channels, video_id, title, description, hashtags):
                 "id": video_id,
                 "snippet": snippet
             }
-            # Keep status unchanged (do NOT alter publishAt or privacyStatus)
+            # Keep status unchanged
             if status:
                 update_body["status"] = status
 
@@ -207,6 +226,7 @@ async def main():
     print(f"Active YT channels: {[c['title'] for c in channels]}")
 
     results = []
+    max_retries = 10
 
     for item in SHORTS:
         yt_id = item["id"]
@@ -215,8 +235,23 @@ async def main():
         print(f"Processing Short: {yt_id} ({slot})")
         print(f"==========================================")
 
-        ensure_vtt_exists(channels, yt_id)
-        desc_res = describe_short(token, yt_id)
+        desc_res = None
+        for attempt in range(1, max_retries + 1):
+            has_vtt = ensure_vtt_exists(channels, yt_id)
+            desc_res = describe_short(token, yt_id)
+            
+            # Verify if result is valid or if ASR error occurred
+            is_error = "error" in desc_res or not (desc_res.get("optimized_title") or desc_res.get("title"))
+            if is_error:
+                print(f"[WARN] Attempt {attempt}/{max_retries} failed for {yt_id}: {desc_res}")
+                if attempt < max_retries:
+                    print("Waiting 60 seconds for ASR / VSE processing...")
+                    time.sleep(60)
+                    token = get_jwt()
+                    continue
+            else:
+                print(f"[SUCCESS] Got describe metadata for {yt_id} on attempt {attempt}")
+                break
         
         opt_title = desc_res.get("optimized_title") or desc_res.get("title") or ""
         desc = desc_res.get("description") or ""
