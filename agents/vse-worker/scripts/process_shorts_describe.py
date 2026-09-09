@@ -32,14 +32,13 @@ from api.models.youtube_channel import YouTubeChannel
 from api.core.youtube_publish import _build_credentials
 
 SHORTS = [
-    {"id": "ioObSLpRGc4", "slot": "01.09 07:00 (PRIORYTET #1)"},
-    {"id": "FtQNSzHtQ0s", "slot": "01.09 12:00 (PRIORYTET #2)"},
-    {"id": "9tjEXGE5sXg", "slot": "01.09 18:00 (PRIORYTET #3)"},
-    {"id": "mw6A9CZ6DuM", "slot": "private"},
-    {"id": "mTyr64ygkJU", "slot": "private"},
-    {"id": "8nbA6YSZAVQ", "slot": "private"},
-    {"id": "slA15REfjpU", "slot": "private"},
-    {"id": "lX2vvs8E-AY", "slot": "private"}
+    {"id": "lX2vvs8E-AY", "slot": "public — fix opisu"},
+    {"id": "G0EE5lM7TkE", "slot": "10.09 07:00 CEST"},
+    {"id": "b-2j28LueLc", "slot": "10.09 12:00 CEST"},
+    {"id": "NpmUYF66MEQ", "slot": "10.09 18:00 CEST"},
+    {"id": "2Y3S5oUtcvQ", "slot": "10.09 21:00 CEST"},
+    {"id": "aXKRv8RzlxE", "slot": "11.09 07:00 CEST"},
+    {"id": "T4YtG2fDhQk", "slot": "11.09 12:00 CEST"},
 ]
 
 PORTAL_ID = "2b047d7d-15a1-4d2f-8463-f89c2275bb73"
