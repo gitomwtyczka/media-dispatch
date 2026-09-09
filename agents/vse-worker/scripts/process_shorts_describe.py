@@ -223,7 +223,7 @@ async def main():
     token = get_jwt()
     print(f"Generated JWT token: {token[:20]}...")
     channels = await get_yt_channels()
-    print(f"Active YT channels: {[c['title'] for c in channels]}\")
+    print(f"Active YT channels: {[c['title'] for c in channels]}")
 
     results = []
     max_retries = 10
