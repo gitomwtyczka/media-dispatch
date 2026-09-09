@@ -223,7 +223,7 @@ async def main():
     token = get_jwt()
     print(f"Generated JWT token: {token[:20]}...")
     channels = await get_yt_channels()
-    print(f"Active YT channels: {[c['title'] for c in channels]}")
+    print(f"Active YT channels: {[c['title'] for c in channels]}\")
 
     results = []
     max_retries = 10
@@ -241,8 +241,9 @@ async def main():
             desc_res = describe_short(token, yt_id)
             
             # Verify if result is valid or if ASR error occurred
-            is_error = "error" in desc_res or not (desc_res.get("optimized_title") or desc_res.get("title"))
-            if is_error:
+            has_error = bool(desc_res.get("error"))
+            has_title = bool(desc_res.get("optimized_title") or desc_res.get("title"))
+            if has_error or not has_title:
                 print(f"[WARN] Attempt {attempt}/{max_retries} failed for {yt_id}: {desc_res}")
                 if attempt < max_retries:
                     print("Waiting 60 seconds for ASR / VSE processing...")
