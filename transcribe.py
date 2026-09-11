@@ -43,6 +43,41 @@ def format_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
 
+def split_segment_by_words(segment, max_duration: float = 5.0):
+    """
+    Dzieli długi segment na podsegmenty max max_duration sekund.
+    Zwraca listę dict: [{start, end, text}, ...]
+    """
+    words = segment.words if segment.words else []
+
+    if not words:
+        return [{"start": segment.start, "end": segment.end, "text": segment.text.strip()}]
+
+    chunks = []
+    chunk_words = []
+    chunk_start = words[0].start
+
+    for i, word in enumerate(words):
+        chunk_words.append(word)
+        duration = word.end - chunk_start
+
+        if duration >= max_duration:
+            text = "".join(w.word for w in chunk_words).strip()
+            if text:
+                chunks.append({"start": chunk_start, "end": word.end, "text": text})
+            chunk_words = []
+            if i + 1 < len(words):
+                chunk_start = words[i + 1].start
+
+    # Ostatni chunk
+    if chunk_words:
+        text = "".join(w.word for w in chunk_words).strip()
+        if text:
+            chunks.append({"start": chunk_words[0].start, "end": chunk_words[-1].end, "text": text})
+
+    return chunks if chunks else [{"start": segment.start, "end": segment.end, "text": segment.text.strip()}]
+
+
 def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool):
     from faster_whisper import WhisperModel
 
@@ -93,17 +128,19 @@ def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool):
     index = 1
 
     for segment in segments:
-        start = format_timestamp(segment.start)
-        end = format_timestamp(segment.end)
-        text = segment.text.strip()
+        sub_segments = split_segment_by_words(segment, max_duration=5.0)
+        for sub in sub_segments:
+            start = format_timestamp(sub["start"])
+            end = format_timestamp(sub["end"])
+            text = sub["text"]
 
-        if not text:
-            continue
+            if not text:
+                continue
 
-        block = f"{index}\n{start} --> {end}\n{text}\n"
-        srt_blocks.append(block)
-        print(f"  [{start} --> {end}] {text}")
-        index += 1
+            block = f"{index}\n{start} --> {end}\n{text}\n"
+            srt_blocks.append(block)
+            print(f"  [{start} --> {end}] {text}")
+            index += 1
 
     with open(output_srt, "w", encoding="utf-8") as f:
         f.write("\n".join(srt_blocks))
