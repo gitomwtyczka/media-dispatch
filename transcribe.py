@@ -11,6 +11,7 @@ Użycie:
     py -3.12 transcribe.py "plik.mp3" --translate  # bezpośrednio do EN
     py -3.12 transcribe.py "plik.mp3" --dual       # PL + EN (dwa przebiegi)
     py -3.12 transcribe.py "plik.mp3" --prompt "Osowski, Płużański, Młodzież Wszechpolska, PRL"
+    py -3.12 transcribe.py "D:\\katalog_z_plikami\\"  # tryb batch (cały katalog)
 
 Wyjście: plik .srt w tym samym katalogu co plik wejściowy.
 """
@@ -33,6 +34,8 @@ if sys.platform == "win32":
 
 from pathlib import Path
 from datetime import timedelta
+
+AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".mp4", ".wmv", ".wma", ".flac", ".ogg", ".aac", ".opus"}
 
 
 def format_timestamp(seconds: float) -> str:
@@ -108,10 +111,8 @@ def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool, t
         print(f"[ERROR] Plik nie istnieje: {audio_path}")
         sys.exit(1)
 
-    if output_suffix:
-        output_srt = audio_path.with_name(audio_path.stem + output_suffix + ".srt")
-    else:
-        output_srt = audio_path.with_suffix(".srt")
+    # output_suffix jest zawsze podawany (np. ".pl", ".en")
+    output_srt = audio_path.with_name(audio_path.stem + output_suffix + ".srt")
 
     if use_cpu:
         device = "cpu"
@@ -179,11 +180,45 @@ def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool, t
     print(f"     {output_srt}")
 
 
+def process_directory(dir_path: str, model_size: str, language: str, use_cpu: bool,
+                      translate: bool, dual: bool, translate_model: str, prompt: str):
+    dir_path = Path(dir_path)
+    audio_files = sorted([f for f in dir_path.iterdir()
+                         if f.is_file() and f.suffix.lower() in AUDIO_EXTENSIONS])
+
+    if not audio_files:
+        print(f"[WARN] Brak plików audio w katalogu: {dir_path}")
+        return
+
+    print(f"[INFO] Znaleziono {len(audio_files)} plików audio w: {dir_path}")
+    for i, audio_file in enumerate(audio_files, 1):
+        print(f"\n[BATCH {i}/{len(audio_files)}] {audio_file.name}")
+        try:
+            if dual:
+                print("[INFO] --- Przebieg 1/2: język źródłowy ---")
+                transcribe(str(audio_file), model_size, language, use_cpu,
+                          task="transcribe", output_suffix=f".{language}", prompt=prompt)
+                print(f"[INFO] --- Przebieg 2/2: tłumaczenie EN (model: {translate_model}) ---")
+                transcribe(str(audio_file), translate_model, language, use_cpu,
+                          task="translate", output_suffix=".en", prompt=prompt)
+            elif translate:
+                transcribe(str(audio_file), translate_model, language, use_cpu,
+                          task="translate", output_suffix=".en", prompt=prompt)
+            else:
+                transcribe(str(audio_file), model_size, language, use_cpu,
+                          task="transcribe", output_suffix=f".{language}", prompt=prompt)
+        except Exception as e:
+            print(f"[ERROR] Pominięto {audio_file.name}: {e}")
+            continue
+
+    print(f"\n[BATCH OK] Przetworzono {len(audio_files)} plików.")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Transkrypcja audio \u2192 SRT (faster-whisper + VAD, GPU CUDA)"
     )
-    parser.add_argument("audio", help="Śceżka do pliku audio (.mp3, .wav, .m4a, ...)")
+    parser.add_argument("audio", help="Ścieżka do pliku lub katalogu audio (.mp3, .wav, .m4a, ...)")
     parser.add_argument(
         "--model", "-m",
         default="turbo",
@@ -208,7 +243,7 @@ def main():
     parser.add_argument(
         "--dual",
         action="store_true",
-        help="Generuj dwa pliki SRT: .pl.srt (oryginalny) i .en.srt (angielski)"
+        help="Generuj dwa pliki SRT: .<lang>.srt (oryginalny) i .en.srt (angielski)"
     )
     parser.add_argument(
         "--prompt", "-p",
@@ -232,20 +267,27 @@ def main():
     else:
         translate_model = args.model
 
-    if args.dual:
-        print("[INFO] Tryb DUAL: generowanie PL + EN")
-        print("[INFO] --- Przebieg 1/2: język źródłowy ---")
-        transcribe(args.audio, args.model, args.language, args.cpu,
-                   task="transcribe", output_suffix=".pl", prompt=args.prompt)
-        print(f"[INFO] --- Przebieg 2/2: tłumaczenie EN (model: {translate_model}) ---")
-        transcribe(args.audio, translate_model, args.language, args.cpu,
-                   task="translate", output_suffix=".en", prompt=args.prompt)
-    elif args.translate:
-        print(f"[INFO] Tłumaczenie EN (model: {translate_model})")
-        transcribe(args.audio, translate_model, args.language, args.cpu,
-                   task="translate", output_suffix=".en", prompt=args.prompt)
+    audio_path = Path(args.audio)
+
+    if audio_path.is_dir():
+        process_directory(args.audio, args.model, args.language, args.cpu,
+                          args.translate, args.dual, translate_model, args.prompt)
     else:
-        transcribe(args.audio, args.model, args.language, args.cpu, prompt=args.prompt)
+        if args.dual:
+            print("[INFO] Tryb DUAL: generowanie PL + EN")
+            print("[INFO] --- Przebieg 1/2: język źródłowy ---")
+            transcribe(args.audio, args.model, args.language, args.cpu,
+                       task="transcribe", output_suffix=f".{args.language}", prompt=args.prompt)
+            print(f"[INFO] --- Przebieg 2/2: tłumaczenie EN (model: {translate_model}) ---")
+            transcribe(args.audio, translate_model, args.language, args.cpu,
+                       task="translate", output_suffix=".en", prompt=args.prompt)
+        elif args.translate:
+            print(f"[INFO] Tłumaczenie EN (model: {translate_model})")
+            transcribe(args.audio, translate_model, args.language, args.cpu,
+                       task="translate", output_suffix=".en", prompt=args.prompt)
+        else:
+            transcribe(args.audio, args.model, args.language, args.cpu,
+                       task="transcribe", output_suffix=f".{args.language}", prompt=args.prompt)
 
 
 if __name__ == "__main__":
