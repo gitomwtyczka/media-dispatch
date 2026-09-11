@@ -13,7 +13,21 @@ Wyjście: plik .srt w tym samym katalogu co plik wejściowy.
 """
 
 import argparse
+import os
 import sys
+
+# Fix dla Windows: ctranslate2 szuka cublas64_12.dll w PATH
+# PyTorch bundluje tę bibliotekę w swoim katalogu lib
+if sys.platform == "win32":
+    try:
+        import torch
+        _torch_lib = os.path.join(os.path.dirname(torch.__file__), "lib")
+        if os.path.isdir(_torch_lib):
+            os.environ["PATH"] = _torch_lib + os.pathsep + os.environ.get("PATH", "")
+            os.add_dll_directory(_torch_lib)
+    except (ImportError, OSError):
+        pass
+
 from pathlib import Path
 from datetime import timedelta
 
