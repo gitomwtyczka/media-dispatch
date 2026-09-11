@@ -1,15 +1,22 @@
 {
-  "callsign": "shorts-worker-03",
+  "callsign": "media-strateg",
   "status": "done",
-  "current_task": "Shorts runda 3: 2 private + 5 public",
-  "timestamp": "2026-09-10T01:41:00+02:00",
+  "current_task": "Sesja 11.09 — transcribe-worker + archeologia",
+  "timestamp": "2026-09-11T23:00:00+02:00",
   "last_completed": [
-    "XBhI8nXMpeg (Ossowski) describe & scheduled for 12.09 18:00 CEST on Studio Prawy_PL",
-    "Local transcript pipeline & VTT generation for 5 public shorts + VSE describe metadata generated for all 7 shorts",
-    "vse-api:/app/apply_shorts_r3_yt.py & /tmp/shorts_r3_results.json deployed for post-quota execution",
-    "Report dual-write — e7e7a13 (media-dispatch) & 78d4e01 (sonic-void)"
+    "transcribe.py — faster-whisper + VAD + CUDA (37309c4 → 3afe7ea)",
+    "--translate, --dual, --prompt, --batch (1fb81da → 3afe7ea)",
+    "P0+P1 fix: min_chunk 0.8s, VAD 800ms (ee6f8a3)",
+    "auto-fallback large-v2 dla translate+turbo (8b31232)",
+    "Profil agenta transcribe-worker: README + constitution (f3a65e5, 28a33ec)",
+    "AGENTS.md update warstwa 3 (b160539)",
+    "Pełna archeologia brain+repo — 106 sesji, ~90 skryptów niesformalizowanych"
   ],
   "pending": [
-    "Run apply_shorts_r3_yt.py after 09:00 CEST YouTube API quota reset to push remaining 6 snippets"
+    "Faza 0: Rotacja sekretów (JWT, GitHub token, WP password)",
+    "Faza 1: Formalizacja prototypów z brain (shorts-agent, pressai-worker, vse pipeline)",
+    "Faza 2: Dokumentacja architektoniczna do repo/docs/",
+    "Faza 3: Constitutions dla pozostałych workerów",
+    "--extract-text w transcribe.py (odblokowuje PressAI pipeline)"
   ]
 }
