@@ -222,16 +222,27 @@ def main():
         print("[ERROR] Wykryto Python 3.14 \u2014 deadlock z CUDA. Użyj: py -3.12 transcribe.py")
         sys.exit(1)
 
+    # Modele które NIE obsługują task=translate
+    TRANSLATE_UNSUPPORTED = {"turbo"}
+
+    if (args.translate or args.dual) and args.model in TRANSLATE_UNSUPPORTED:
+        print(f"[WARN] Model '{args.model}' nie obsługuje tłumaczenia (task=translate).")
+        print(f"[WARN] Automatycznie przełączam na large-v2 dla tłumaczenia.")
+        translate_model = "large-v2"
+    else:
+        translate_model = args.model
+
     if args.dual:
         print("[INFO] Tryb DUAL: generowanie PL + EN")
         print("[INFO] --- Przebieg 1/2: język źródłowy ---")
         transcribe(args.audio, args.model, args.language, args.cpu,
                    task="transcribe", output_suffix=".pl", prompt=args.prompt)
-        print("[INFO] --- Przebieg 2/2: tłumaczenie EN ---")
-        transcribe(args.audio, args.model, args.language, args.cpu,
+        print(f"[INFO] --- Przebieg 2/2: tłumaczenie EN (model: {translate_model}) ---")
+        transcribe(args.audio, translate_model, args.language, args.cpu,
                    task="translate", output_suffix=".en", prompt=args.prompt)
     elif args.translate:
-        transcribe(args.audio, args.model, args.language, args.cpu,
+        print(f"[INFO] Tłumaczenie EN (model: {translate_model})")
+        transcribe(args.audio, translate_model, args.language, args.cpu,
                    task="translate", output_suffix=".en", prompt=args.prompt)
     else:
         transcribe(args.audio, args.model, args.language, args.cpu, prompt=args.prompt)
