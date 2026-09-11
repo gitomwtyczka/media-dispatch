@@ -43,9 +43,9 @@ def format_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
 
-def split_segment_by_words(segment, max_duration: float = 5.0):
+def split_segment_by_words(segment, max_duration: float = 3.0, max_chars: int = 42):
     """
-    Dzieli długi segment na podsegmenty max max_duration sekund.
+    Dzieli długi segment na podsegmenty max max_duration sekund lub max_chars znaków.
     Zwraca listę dict: [{start, end, text}, ...]
     """
     words = segment.words if segment.words else []
@@ -56,16 +56,22 @@ def split_segment_by_words(segment, max_duration: float = 5.0):
     chunks = []
     chunk_words = []
     chunk_start = words[0].start
+    chunk_chars = 0
 
     for i, word in enumerate(words):
+        word_text = word.word  # np. " Dzień"
         chunk_words.append(word)
+        chunk_chars += len(word_text)
         duration = word.end - chunk_start
 
-        if duration >= max_duration:
+        should_cut = (duration >= max_duration) or (chunk_chars >= max_chars and len(chunk_words) > 1)
+
+        if should_cut:
             text = "".join(w.word for w in chunk_words).strip()
             if text:
                 chunks.append({"start": chunk_start, "end": word.end, "text": text})
             chunk_words = []
+            chunk_chars = 0
             if i + 1 < len(words):
                 chunk_start = words[i + 1].start
 
@@ -128,7 +134,7 @@ def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool):
     index = 1
 
     for segment in segments:
-        sub_segments = split_segment_by_words(segment, max_duration=5.0)
+        sub_segments = split_segment_by_words(segment, max_duration=3.0, max_chars=42)
         for sub in sub_segments:
             start = format_timestamp(sub["start"])
             end = format_timestamp(sub["end"])
