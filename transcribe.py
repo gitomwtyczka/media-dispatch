@@ -8,6 +8,8 @@ Użycie:
     py -3.12 transcribe.py "D:\\Biblioteki\\prawy video\\07.09\\plik.mp3"
     py -3.12 transcribe.py "plik.mp3" --model large-v2 --language pl
     py -3.12 transcribe.py "plik.mp3" --cpu   # fallback CPU
+    py -3.12 transcribe.py "plik.mp3" --translate  # bezpośrednio do EN
+    py -3.12 transcribe.py "plik.mp3" --dual       # PL + EN (dwa przebiegi)
 
 Wyjście: plik .srt w tym samym katalogu co plik wejściowy.
 """
@@ -84,7 +86,7 @@ def split_segment_by_words(segment, max_duration: float = 3.0, max_chars: int = 
     return chunks if chunks else [{"start": segment.start, "end": segment.end, "text": segment.text.strip()}]
 
 
-def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool):
+def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool, task: str = "transcribe", output_suffix: str = ""):
     from faster_whisper import WhisperModel
 
     audio_path = Path(audio_path)
@@ -92,7 +94,10 @@ def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool):
         print(f"[ERROR] Plik nie istnieje: {audio_path}")
         sys.exit(1)
 
-    output_srt = audio_path.with_suffix(".srt")
+    if output_suffix:
+        output_srt = audio_path.with_name(audio_path.stem + output_suffix + ".srt")
+    else:
+        output_srt = audio_path.with_suffix(".srt")
 
     if use_cpu:
         device = "cpu"
@@ -105,6 +110,7 @@ def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool):
 
     print(f"[INFO] Model: {model_size}")
     print(f"[INFO] Język: {language}")
+    print(f"[INFO] Task: {task}")
     print(f"[INFO] Plik wejściowy: {audio_path}")
     print(f"[INFO] Plik wyjściowy: {output_srt}")
     print("[INFO] Ładowanie modelu...")
@@ -116,6 +122,7 @@ def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool):
     segments, info = model.transcribe(
         str(audio_path),
         language=language,
+        task=task,
         condition_on_previous_text=False,
         vad_filter=True,
         vad_parameters=dict(
@@ -176,6 +183,16 @@ def main():
         action="store_true",
         help="Wymusz CPU zamiast CUDA (wolniejsze, fallback)"
     )
+    parser.add_argument(
+        "--translate",
+        action="store_true",
+        help="Transkrybuj audio bezpośrednio do angielskiego (task=translate)"
+    )
+    parser.add_argument(
+        "--dual",
+        action="store_true",
+        help="Generuj dwa pliki SRT: .pl.srt (oryginalny) i .en.srt (angielski)"
+    )
 
     args = parser.parse_args()
 
@@ -183,7 +200,19 @@ def main():
         print("[ERROR] Wykryto Python 3.14 \u2014 deadlock z CUDA. Użyj: py -3.12 transcribe.py")
         sys.exit(1)
 
-    transcribe(args.audio, args.model, args.language, args.cpu)
+    if args.dual:
+        print("[INFO] Tryb DUAL: generowanie PL + EN")
+        print("[INFO] --- Przebieg 1/2: język źródłowy ---")
+        transcribe(args.audio, args.model, args.language, args.cpu,
+                   task="transcribe", output_suffix=".pl")
+        print("[INFO] --- Przebieg 2/2: tłumaczenie EN ---")
+        transcribe(args.audio, args.model, args.language, args.cpu,
+                   task="translate", output_suffix=".en")
+    elif args.translate:
+        transcribe(args.audio, args.model, args.language, args.cpu,
+                   task="translate", output_suffix=".en")
+    else:
+        transcribe(args.audio, args.model, args.language, args.cpu)
 
 
 if __name__ == "__main__":
