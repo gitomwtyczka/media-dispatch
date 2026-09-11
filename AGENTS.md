@@ -3,7 +3,7 @@
 Reguły specyficzne dla workspace `media-dispatch`.
 Uzupełnia `RULE[user_global]` — nie zastępuje.
 
-> Ostatnia aktualizacja: 2026-09-01 | media-dev-29
+> Ostatnia aktualizacja: 2026-09-11 | media-dev-37
 
 ---
 
@@ -55,6 +55,7 @@ Duplikacja OK: priorytetowe pojawiają się na obu kanałach.
 ### Warstwa 3 — Production
 - `vse-worker` — video → transkrypcja Whisper → SEO + shorty + draft WP
 - `pressai-worker` — tekst/link/mail → artykuł
+- `transcribe-worker` — audio → SRT (faster-whisper + VAD + CUDA; obsługuje batch, dual PL+EN, prompt)
 
 ### Warstwa 4 — Distribution
 - `youtube-worker`, `wp-publisher`, `tiktok-worker`, `telegram-worker`
@@ -103,11 +104,11 @@ Konfiguracja kanałów w **bazie danych VSE** — nie w plikach YAML.
 1. Jawnego zatwierdzenia w arkuszu Google Sheets (kolumna Status = 'Zatwierdź'), LUB
 2. Jawnego komunikatu od użytkownika z nazwą materiału i datą publikacji.
 
-DOMYŚLNY STATUS zawsze:
+DOM YśLNY STATUS zawsze:
 - WordPress: `draft`
 - YouTube: `unlisted`
 
-WYJĄTEK: tylko gdy użytkownik poda explicite "opublikuj", "publish", "live" lub konkretną datę publikacji przy zleceniu.
+WYJĄTEK: tylko gdy użytkownik poda explicite "opublikuj", "publish", "live" lub konkretna datę publikacji przy zleceniu.
 
 Naruszenie tej reguły = błąd krytyczny wymagający natychmiastowego rewertu.
 
@@ -138,7 +139,7 @@ Naruszenie tej reguły = błąd krytyczny wymagający natychmiastowego rewertu.
 > Dodane: 04.09.2026 | Odpowiedź na halucynacje z omijaniem protokołów w oparciu o GUI.
 
 Zabrania się uruchamiania przeglądarek (Chrome/Wetty/panele) przez Subagentów-Workerów, gdy zawiodą narzędzia powłoki. 
-Worker ma zakaz naprawiania błędów (np. błędy 'Cwd' czy escape'owania cudzysłowów) poprzez ucieczkę do interfejsu graficznego.
+Worker ma zakaz naprawiania błędów (np. błędy 'Cwd' czy escape'owania cudzysłowów) poprzez ucieczkusze do interfejsu graficznego.
 Nowy standard operacyjny definiuje Subagenta `vps_worker` jako wyłącznego wykonawcę zadań produkcyjnych na serwerze:
 - Worker ten jest ślepym egzekutorem i przyjmuje komendy systemowe 1:1.
 - Jakikolwiek błąd wywołania skutkuje powrotem do Supervisora ze statusem Failed i logiem błędu, bez prób użycia interfejsów GUI.
@@ -206,14 +207,14 @@ Kiedy worker musi wykonać pipeline:
 - Worker dostaje jedną komendę: `python skrypt.py`
 - Wzorzec: `agents/vse-worker/scripts/biblia_backlog_pipeline.py`
 
-### Odkładanie wiedzy przez workera
+### Odкładanie wiedzy przez workera
 
 Worker po zakończeniu zadania POWINIEN zaktualizować:
 - `.agents/knowledge/` — jeśli odkrył nową pułapkę lub wzorzec
 - `.agents/reports/` — raport z wynikami (dual-write do sonic-void)
 - Istniejący skrypt w `agents/*/scripts/` — jeśli naprawił bug lub dodał feature
 
-Worker MOŻE odkładać tymczasową wiedzę w scratch swojego workspace
+Worker MOŻE odładać tymczasową wiedzę w scratch swojego workspace
 (np. zapisane tokeny do ponownego użycia w tej samej sesji).
 
 ### Anty-wzorzec (czego NIE robić)
@@ -234,4 +235,5 @@ Worker MOŻE odkładać tymczasową wiedzę w scratch swojego workspace
 *Rozbudowa: media-strateg | 30.08.2026 — Dispatch Protocol, self-contained scripts, hierarchia wiedzy*  
 *Rozbudowa: media-dev-06 | 31.08.2026 — reguła publikowania bezwzględna, Short Machine*  
 *Rozbudowa: media-dev-22 | 01.09.2026 — Discord Editorial Center w architekturze*  
-*Rozbudowa: media-dev-29 | 01.09.2026 — dual-channel Discord (#editorial-priority + #editorial-kurier365)*
+*Rozbudowa: media-dev-29 | 01.09.2026 — dual-channel Discord (#editorial-priority + #editorial-kurier365)*  
+*Rozbudowa: media-dev-37 | 11.09.2026 — transcribe-worker (Warstwa 3 Production)*
