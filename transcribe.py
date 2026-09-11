@@ -10,6 +10,7 @@ Użycie:
     py -3.12 transcribe.py "plik.mp3" --cpu   # fallback CPU
     py -3.12 transcribe.py "plik.mp3" --translate  # bezpośrednio do EN
     py -3.12 transcribe.py "plik.mp3" --dual       # PL + EN (dwa przebiegi)
+    py -3.12 transcribe.py "plik.mp3" --prompt "Osowski, Płużański, Młodzież Wszechpolska, PRL"
 
 Wyjście: plik .srt w tym samym katalogu co plik wejściowy.
 """
@@ -50,6 +51,7 @@ def split_segment_by_words(segment, max_duration: float = 3.0, max_chars: int = 
     Dzieli długi segment na podsegmenty max max_duration sekund lub max_chars znaków.
     Zwraca listę dict: [{start, end, text}, ...]
     """
+    MIN_CHUNK_DURATION = 0.8  # min czas trwania segmentu (oko zdazy przeczytac)
     words = segment.words if segment.words else []
 
     if not words:
@@ -61,12 +63,15 @@ def split_segment_by_words(segment, max_duration: float = 3.0, max_chars: int = 
     chunk_chars = 0
 
     for i, word in enumerate(words):
-        word_text = word.word  # np. " Dzień"
+        word_text = word.word
         chunk_words.append(word)
         chunk_chars += len(word_text)
         duration = word.end - chunk_start
 
-        should_cut = (duration >= max_duration) or (chunk_chars >= max_chars and len(chunk_words) > 1)
+        should_cut = (
+            (duration >= max_duration) or
+            (chunk_chars >= max_chars and len(chunk_words) > 1)
+        ) and duration >= MIN_CHUNK_DURATION
 
         if should_cut:
             text = "".join(w.word for w in chunk_words).strip()
@@ -81,12 +86,21 @@ def split_segment_by_words(segment, max_duration: float = 3.0, max_chars: int = 
     if chunk_words:
         text = "".join(w.word for w in chunk_words).strip()
         if text:
-            chunks.append({"start": chunk_words[0].start, "end": chunk_words[-1].end, "text": text})
+            # Jeśli ostatni chunk jest za krótki, dołącz do poprzedniego
+            last_duration = chunk_words[-1].end - chunk_words[0].start
+            if last_duration < MIN_CHUNK_DURATION and chunks:
+                # Dolącz do ostatniego chunku
+                prev = chunks[-1]
+                prev_text = prev["text"]
+                combined_text = (prev_text + " " + text).strip()
+                chunks[-1] = {"start": prev["start"], "end": chunk_words[-1].end, "text": combined_text}
+            else:
+                chunks.append({"start": chunk_words[0].start, "end": chunk_words[-1].end, "text": text})
 
     return chunks if chunks else [{"start": segment.start, "end": segment.end, "text": segment.text.strip()}]
 
 
-def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool, task: str = "transcribe", output_suffix: str = ""):
+def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool, task: str = "transcribe", output_suffix: str = "", prompt: str = ""):
     from faster_whisper import WhisperModel
 
     audio_path = Path(audio_path)
@@ -113,6 +127,8 @@ def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool, t
     print(f"[INFO] Task: {task}")
     print(f"[INFO] Plik wejściowy: {audio_path}")
     print(f"[INFO] Plik wyjściowy: {output_srt}")
+    if prompt:
+        print(f"[INFO] Prompt: {prompt}")
     print("[INFO] Ładowanie modelu...")
 
     model = WhisperModel(model_size, device=device, compute_type=compute_type)
@@ -126,12 +142,13 @@ def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool, t
         condition_on_previous_text=False,
         vad_filter=True,
         vad_parameters=dict(
-            min_silence_duration_ms=500,
+            min_silence_duration_ms=800,   # było 500 — za krótkie dla polskich pauz retorycznych
             threshold=0.5,
-            speech_pad_ms=200,
+            speech_pad_ms=300,              # było 200 — lepsza ochrona końców słów
         ),
         word_timestamps=True,
         beam_size=5,
+        initial_prompt=prompt if prompt else None,
     )
 
     print(f"[INFO] Wykryty język: {info.language} (pewność: {info.language_probability:.1%})")
@@ -193,6 +210,11 @@ def main():
         action="store_true",
         help="Generuj dwa pliki SRT: .pl.srt (oryginalny) i .en.srt (angielski)"
     )
+    parser.add_argument(
+        "--prompt", "-p",
+        default="",
+        help="Wskazówka dla modelu (nazwy własne, kontekst). Np. --prompt \"Osowski, Płużański, Młodzież Wszechpolska, PRL\""
+    )
 
     args = parser.parse_args()
 
@@ -204,15 +226,15 @@ def main():
         print("[INFO] Tryb DUAL: generowanie PL + EN")
         print("[INFO] --- Przebieg 1/2: język źródłowy ---")
         transcribe(args.audio, args.model, args.language, args.cpu,
-                   task="transcribe", output_suffix=".pl")
+                   task="transcribe", output_suffix=".pl", prompt=args.prompt)
         print("[INFO] --- Przebieg 2/2: tłumaczenie EN ---")
         transcribe(args.audio, args.model, args.language, args.cpu,
-                   task="translate", output_suffix=".en")
+                   task="translate", output_suffix=".en", prompt=args.prompt)
     elif args.translate:
         transcribe(args.audio, args.model, args.language, args.cpu,
-                   task="translate", output_suffix=".en")
+                   task="translate", output_suffix=".en", prompt=args.prompt)
     else:
-        transcribe(args.audio, args.model, args.language, args.cpu)
+        transcribe(args.audio, args.model, args.language, args.cpu, prompt=args.prompt)
 
 
 if __name__ == "__main__":
