@@ -1,20 +1,20 @@
 {
   "callsign": "media-strateg",
-  "status": "working",
-  "current_task": "Faza 1 — Dispatch 4 agentów równolegle: shorts-agent, pressai-worker, vse-worker/pipeline, emisja-worker",
-  "timestamp": "2026-09-12T10:40:00+02:00",
+  "status": "czekam na GO",
+  "current_task": "Faza 1 kompletna — czekam na decyzję o testach workerów",
+  "timestamp": "2026-09-12T10:53:00+02:00",
   "last_completed": [
-    "transcribe.py — faster-whisper + VAD + CUDA (37309c4 → 3afe7ea)",
-    "--translate, --dual, --prompt, --batch (1fb81da → 3afe7ea)",
-    "Profil agenta transcribe-worker: README + constitution (f3a65e5, 28a33ec)",
-    "Pełna archeologia brain+repo — 106 sesji, ~90 skryptów niesformalizowanych"
+    "shorts-agent: worker.py + scheduler.py (cd961dd, da39de2) [media-dev-A]",
+    "pressai-worker: auto_publisher.py + worker.py (9612364, 488fde4) [media-dev-B]",
+    "vse-worker: pipeline.py + worker.py (7f0ed34, ad738a0) [media-dev-C]",
+    "emisja-worker: collab_linker.py + worker.py (9808e4a, 6e8471) [media-dev-D]",
+    "transcribe-worker: faster-whisper + VAD + CUDA (3afe7ea)",
+    "Pełna archeologia: 106 sesji, ~90 skryptów"
   ],
   "pending": [
-    "Agent A: shorts-agent worker.py + scheduler.py [W TOKU]",
-    "Agent B: pressai-worker auto_publisher.py [W TOKU]",
-    "Agent C: vse-worker/pipeline.py [W TOKU]",
-    "Agent D: emisja-worker/collab_linker.py [W TOKU]",
-    "Faza 0: Rotacja sekretów (JWT, GitHub token, WP password)",
-    "Testy każdego workera po raporcie wszystkich 4"
+    "Testy health_check() dla wszystkich 4 workerów",
+    "Rotacja sekretów (JWT, GitHub token, WP password)",
+    "--extract-text do transcribe.py",
+    "Faza 2: Dokumentacja architektoniczna"
   ]
 }
