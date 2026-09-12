@@ -1,15 +1,15 @@
 {
-  "callsign": "media-dev-B",
+  "callsign": "media-dev-C",
   "status": "working",
-  "current_task": "Budowa pressai-worker/auto_publisher.py, worker.py, README.md, constitution.md",
-  "timestamp": "2026-09-12T10:44:15Z",
+  "current_task": "Budowa vse-worker/pipeline.py, worker.py, README.md, constitution.md",
+  "timestamp": "2026-09-12T10:48:30Z",
   "last_completed": [
     "Wdrożenie nowej architektury na VPS, dodanie tokena PRESSAI_JWT_USER i konfiguracja crona — commit 9fea91a (06.09.2026)"
   ],
   "pending": [
-    "agents/pressai-worker/auto_publisher.py — implementacja AutoPublisher",
-    "agents/pressai-worker/worker.py — wrapper modułowy (health_check, process, get_status)",
-    "agents/pressai-worker/README.md — dokumentacja i instrukcja użycia",
-    "agents/pressai-worker/constitution.md — konstytucja workera"
+    "agents/vse-worker/pipeline.py — implementacja VSEPipeline",
+    "agents/vse-worker/worker.py — wrapper modułowy (health_check, process, get_status)",
+    "agents/vse-worker/README.md — dokumentacja i instrukcja użycia",
+    "agents/vse-worker/constitution.md — konstytucja workera"
   ]
 }
