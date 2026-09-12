@@ -11,6 +11,7 @@ Użycie:
     py -3.12 transcribe.py "plik.mp3" --translate  # bezpośrednio do EN
     py -3.12 transcribe.py "plik.mp3" --dual       # PL + EN (dwa przebiegi)
     py -3.12 transcribe.py "plik.mp3" --prompt "Osowski, Płużański, Młodzież Wszechpolska, PRL"
+    py -3.12 transcribe.py "plik.mp3" --extract-text  # dodatkowo zapisuje .pl.txt
     py -3.12 transcribe.py "D:\\katalog_z_plikami\\"  # tryb batch (cały katalog)
 
 Wyjście: plik .srt w tym samym katalogu co plik wejściowy.
@@ -103,7 +104,9 @@ def split_segment_by_words(segment, max_duration: float = 3.0, max_chars: int = 
     return chunks if chunks else [{"start": segment.start, "end": segment.end, "text": segment.text.strip()}]
 
 
-def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool, task: str = "transcribe", output_suffix: str = "", prompt: str = ""):
+def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool,
+               task: str = "transcribe", output_suffix: str = "", prompt: str = "",
+               extract_text: bool = False):
     from faster_whisper import WhisperModel
 
     audio_path = Path(audio_path)
@@ -155,6 +158,7 @@ def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool, t
     print(f"[INFO] Wykryty język: {info.language} (pewność: {info.language_probability:.1%})")
     print("[INFO] Zapis SRT...")
 
+    all_plain_lines = []
     srt_blocks = []
     index = 1
 
@@ -168,6 +172,7 @@ def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool, t
             if not text:
                 continue
 
+            all_plain_lines.append(text)
             block = f"{index}\n{start} --> {end}\n{text}\n"
             srt_blocks.append(block)
             print(f"  [{start} --> {end}] {text}")
@@ -176,12 +181,18 @@ def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool, t
     with open(output_srt, "w", encoding="utf-8") as f:
         f.write("\n".join(srt_blocks))
 
+    if extract_text:
+        text_path = output_srt.with_suffix('.txt')
+        text_path.write_text('\n'.join(all_plain_lines), encoding='utf-8')
+        print(f"[OK] Plain text: {text_path}")
+
     print(f"\n[OK] Gotowe! {index - 1} segmentów zapisanych do:")
     print(f"     {output_srt}")
 
 
 def process_directory(dir_path: str, model_size: str, language: str, use_cpu: bool,
-                      translate: bool, dual: bool, translate_model: str, prompt: str):
+                      translate: bool, dual: bool, translate_model: str, prompt: str,
+                      extract_text: bool = False):
     dir_path = Path(dir_path)
     audio_files = sorted([f for f in dir_path.iterdir()
                          if f.is_file() and f.suffix.lower() in AUDIO_EXTENSIONS])
@@ -197,16 +208,20 @@ def process_directory(dir_path: str, model_size: str, language: str, use_cpu: bo
             if dual:
                 print("[INFO] --- Przebieg 1/2: język źródłowy ---")
                 transcribe(str(audio_file), model_size, language, use_cpu,
-                          task="transcribe", output_suffix=f".{language}", prompt=prompt)
+                          task="transcribe", output_suffix=f".{language}", prompt=prompt,
+                          extract_text=extract_text)
                 print(f"[INFO] --- Przebieg 2/2: tłumaczenie EN (model: {translate_model}) ---")
                 transcribe(str(audio_file), translate_model, language, use_cpu,
-                          task="translate", output_suffix=".en", prompt=prompt)
+                          task="translate", output_suffix=".en", prompt=prompt,
+                          extract_text=extract_text)
             elif translate:
                 transcribe(str(audio_file), translate_model, language, use_cpu,
-                          task="translate", output_suffix=".en", prompt=prompt)
+                          task="translate", output_suffix=".en", prompt=prompt,
+                          extract_text=extract_text)
             else:
                 transcribe(str(audio_file), model_size, language, use_cpu,
-                          task="transcribe", output_suffix=f".{language}", prompt=prompt)
+                          task="transcribe", output_suffix=f".{language}", prompt=prompt,
+                          extract_text=extract_text)
         except Exception as e:
             print(f"[ERROR] Pominięto {audio_file.name}: {e}")
             continue
@@ -216,7 +231,7 @@ def process_directory(dir_path: str, model_size: str, language: str, use_cpu: bo
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Transkrypcja audio \u2192 SRT (faster-whisper + VAD, GPU CUDA)"
+        description="Transkrypcja audio → SRT (faster-whisper + VAD, GPU CUDA)"
     )
     parser.add_argument("audio", help="Ścieżka do pliku lub katalogu audio (.mp3, .wav, .m4a, ...)")
     parser.add_argument(
@@ -250,11 +265,16 @@ def main():
         default="",
         help="Wskazówka dla modelu (nazwy własne, kontekst). Np. --prompt \"Osowski, Płużański, Młodzież Wszechpolska, PRL\""
     )
+    parser.add_argument(
+        "--extract-text",
+        action="store_true",
+        help="Zapisz też plik .txt z czystym tekstem (bez timestampów) — gotowy dla PressAI"
+    )
 
     args = parser.parse_args()
 
     if "Python314" in sys.executable or "python314" in sys.executable:
-        print("[ERROR] Wykryto Python 3.14 \u2014 deadlock z CUDA. Użyj: py -3.12 transcribe.py")
+        print("[ERROR] Wykryto Python 3.14 — deadlock z CUDA. Użyj: py -3.12 transcribe.py")
         sys.exit(1)
 
     # Modele które NIE obsługują task=translate
@@ -271,23 +291,28 @@ def main():
 
     if audio_path.is_dir():
         process_directory(args.audio, args.model, args.language, args.cpu,
-                          args.translate, args.dual, translate_model, args.prompt)
+                          args.translate, args.dual, translate_model, args.prompt,
+                          extract_text=args.extract_text)
     else:
         if args.dual:
             print("[INFO] Tryb DUAL: generowanie PL + EN")
             print("[INFO] --- Przebieg 1/2: język źródłowy ---")
             transcribe(args.audio, args.model, args.language, args.cpu,
-                       task="transcribe", output_suffix=f".{args.language}", prompt=args.prompt)
+                       task="transcribe", output_suffix=f".{args.language}", prompt=args.prompt,
+                       extract_text=args.extract_text)
             print(f"[INFO] --- Przebieg 2/2: tłumaczenie EN (model: {translate_model}) ---")
             transcribe(args.audio, translate_model, args.language, args.cpu,
-                       task="translate", output_suffix=".en", prompt=args.prompt)
+                       task="translate", output_suffix=".en", prompt=args.prompt,
+                       extract_text=args.extract_text)
         elif args.translate:
             print(f"[INFO] Tłumaczenie EN (model: {translate_model})")
             transcribe(args.audio, translate_model, args.language, args.cpu,
-                       task="translate", output_suffix=".en", prompt=args.prompt)
+                       task="translate", output_suffix=".en", prompt=args.prompt,
+                       extract_text=args.extract_text)
         else:
             transcribe(args.audio, args.model, args.language, args.cpu,
-                       task="transcribe", output_suffix=f".{args.language}", prompt=args.prompt)
+                       task="transcribe", output_suffix=f".{args.language}", prompt=args.prompt,
+                       extract_text=args.extract_text)
 
 
 if __name__ == "__main__":
