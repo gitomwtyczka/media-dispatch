@@ -1,15 +1,16 @@
 {
-  "callsign": "media-dev-C",
-  "status": "working",
-  "current_task": "Budowa vse-worker/pipeline.py, worker.py, README.md, constitution.md",
-  "timestamp": "2026-09-12T10:48:30Z",
+  "callsign": "media-dev-D",
+  "status": "done",
+  "current_task": "Zakończono budowę emisja-worker: collab_linker.py, worker.py, README.md, constitution.md",
+  "timestamp": "2026-09-12T10:50:30Z",
   "last_completed": [
-    "Wdrożenie nowej architektury na VPS, dodanie tokena PRESSAI_JWT_USER i konfiguracja crona — commit 9fea91a (06.09.2026)"
+    "agents/emisja-worker/collab_linker.py — commit 9808e4a (12.09.2026)",
+    "agents/emisja-worker/worker.py — commit 6e84715 (12.09.2026)",
+    "agents/emisja-worker/__init__.py — commit 3ad19ed (12.09.2026)",
+    "agents/emisja-worker/README.md — commit 0e75afa (12.09.2026)",
+    "agents/emisja-worker/constitution.md — commit 52d8d80 (12.09.2026)",
+    "Raport w media-dispatch — commit 21acefa (12.09.2026)",
+    "Raport w sonic-void/inbox — commit 3f84164 (12.09.2026)"
   ],
-  "pending": [
-    "agents/vse-worker/pipeline.py — implementacja VSEPipeline",
-    "agents/vse-worker/worker.py — wrapper modułowy (health_check, process, get_status)",
-    "agents/vse-worker/README.md — dokumentacja i instrukcja użycia",
-    "agents/vse-worker/constitution.md — konstytucja workera"
-  ]
+  "pending": []
 }
