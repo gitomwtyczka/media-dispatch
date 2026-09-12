@@ -1,16 +1,15 @@
 {
-  "callsign": "media-dev-C",
-  "status": "done",
-  "current_task": "Zakończono budowę vse-worker: pipeline.py, worker.py, __init__.py, README.md, constitution.md",
-  "timestamp": "2026-09-12T10:52:45Z",
+  "callsign": "media-dev-G",
+  "status": "working",
+  "current_task": "Budowa biblia-worker: biblia_sheets_sync.py, worker.py, README, constitution, naprawa biblia_full_pipeline.py oraz DB fix",
+  "timestamp": "2026-09-12T17:23:00Z",
   "last_completed": [
-    "agents/vse-worker/pipeline.py — commit 7f0ed34 (12.09.2026)",
-    "agents/vse-worker/worker.py — commit ad738a0 (12.09.2026)",
-    "agents/vse-worker/README.md — commit bc7732f (12.09.2026)",
-    "agents/vse-worker/constitution.md — commit 62dfcf1 (12.09.2026)",
-    "agents/vse-worker/__init__.py — commit 4bcba15 (12.09.2026)",
-    "Raport w media-dispatch — commit 5b29942 (12.09.2026)",
-    "Raport w sonic-void/inbox — commit fdbabbc (12.09.2026)"
+    "Poprzednia sesja media-dev-C zakończona"
   ],
-  "pending": []
+  "pending": [
+    "Zadanie 1: Napraw agents/vse-worker/scripts/biblia_full_pipeline.py",
+    "Zadanie 2: Zbuduj agents/biblia-worker/biblia_sheets_sync.py",
+    "Zadanie 3: Zbuduj agents/biblia-worker/worker.py, README.md, constitution.md",
+    "Zadanie 4: Popraw nazwę kanału w bazie VSE"
+  ]
 }
