@@ -1,17 +1,16 @@
 {
-  "callsign": "media-dev-B",
+  "callsign": "media-dev-C",
   "status": "done",
-  "current_task": "Zakończono budowę pressai-worker: auto_publisher.py, worker.py, __init__.py, README.md, constitution.md",
-  "timestamp": "2026-09-12T10:51:25Z",
+  "current_task": "Zakończono budowę vse-worker: pipeline.py, worker.py, __init__.py, README.md, constitution.md",
+  "timestamp": "2026-09-12T10:52:45Z",
   "last_completed": [
-    "agents/pressai-worker/auto_publisher.py — commit 9612364 (12.09.2026)",
-    "agents/pressai-worker/worker.py — commit 488fde4 (12.09.2026)",
-    "agents/pressai-worker/README.md — commit 8baf6cc (12.09.2026)",
-    "agents/pressai-worker/constitution.md — commit 8d73de1 (12.09.2026)",
-    "agents/pressai-worker/__init__.py — commit d3a1b7e (12.09.2026)",
-    "Raport w media-dispatch — commit 50754f7 (12.09.2026)",
-    "Raport w sonic-void/inbox — commit 90ba1ff (12.09.2026)",
-    "Aktualizacja current.md — commit a0beee5 (12.09.2026)"
+    "agents/vse-worker/pipeline.py — commit 7f0ed34 (12.09.2026)",
+    "agents/vse-worker/worker.py — commit ad738a0 (12.09.2026)",
+    "agents/vse-worker/README.md — commit bc7732f (12.09.2026)",
+    "agents/vse-worker/constitution.md — commit 62dfcf1 (12.09.2026)",
+    "agents/vse-worker/__init__.py — commit 4bcba15 (12.09.2026)",
+    "Raport w media-dispatch — commit 5b29942 (12.09.2026)",
+    "Raport w sonic-void/inbox — commit fdbabbc (12.09.2026)"
   ],
   "pending": []
 }
