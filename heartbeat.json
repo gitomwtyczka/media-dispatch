@@ -1,16 +1,17 @@
 {
-  "callsign": "media-dev-D",
+  "callsign": "media-dev-B",
   "status": "done",
-  "current_task": "Zakończono budowę emisja-worker: collab_linker.py, worker.py, README.md, constitution.md",
-  "timestamp": "2026-09-12T10:50:30Z",
+  "current_task": "Zakończono budowę pressai-worker: auto_publisher.py, worker.py, __init__.py, README.md, constitution.md",
+  "timestamp": "2026-09-12T10:51:25Z",
   "last_completed": [
-    "agents/emisja-worker/collab_linker.py — commit 9808e4a (12.09.2026)",
-    "agents/emisja-worker/worker.py — commit 6e84715 (12.09.2026)",
-    "agents/emisja-worker/__init__.py — commit 3ad19ed (12.09.2026)",
-    "agents/emisja-worker/README.md — commit 0e75afa (12.09.2026)",
-    "agents/emisja-worker/constitution.md — commit 52d8d80 (12.09.2026)",
-    "Raport w media-dispatch — commit 21acefa (12.09.2026)",
-    "Raport w sonic-void/inbox — commit 3f84164 (12.09.2026)"
+    "agents/pressai-worker/auto_publisher.py — commit 9612364 (12.09.2026)",
+    "agents/pressai-worker/worker.py — commit 488fde4 (12.09.2026)",
+    "agents/pressai-worker/README.md — commit 8baf6cc (12.09.2026)",
+    "agents/pressai-worker/constitution.md — commit 8d73de1 (12.09.2026)",
+    "agents/pressai-worker/__init__.py — commit d3a1b7e (12.09.2026)",
+    "Raport w media-dispatch — commit 50754f7 (12.09.2026)",
+    "Raport w sonic-void/inbox — commit 90ba1ff (12.09.2026)",
+    "Aktualizacja current.md — commit a0beee5 (12.09.2026)"
   ],
   "pending": []
 }
