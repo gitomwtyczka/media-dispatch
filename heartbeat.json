@@ -1,11 +1,15 @@
 {
-  "callsign": "media-deploy",
-  "status": "done",
-  "current_task": "Wdrożenie nowej architektury na VPS, dodanie tokena PRESSAI_JWT_USER i konfiguracja crona",
-  "timestamp": "2026-09-06T15:35:00Z",
+  "callsign": "media-dev-D",
+  "status": "working",
+  "current_task": "Budowa emisja-worker/collab_linker.py, worker.py, README.md, constitution.md",
+  "timestamp": "2026-09-12T10:43:10Z",
   "last_completed": [
-    "Raport w media-dispatch - commit 9fea91aa33e6f5bcf79aeeb045fe9f0b42ef165d (06.09.2026)",
-    "Raport w sonic-void/inbox - commit 31e050efa9ee18cdfb1e6c4b2bcb107400dae831 (06.09.2026)"
+    "Wdrożenie nowej architektury na VPS, dodanie tokena PRESSAI_JWT_USER i konfiguracja crona — commit 9fea91a (06.09.2026)"
   ],
-  "pending": []
+  "pending": [
+    "agents/emisja-worker/collab_linker.py — implementacja CollabLinker",
+    "agents/emisja-worker/worker.py — wrapper metod health_check, process, get_status",
+    "agents/emisja-worker/README.md — dokumentacja",
+    "agents/emisja-worker/constitution.md — konstytucja workera"
+  ]
 }
