@@ -1,6 +1,7 @@
 # current.md — media-dispatch
 
 ## ✅ Zamknięte
+- vse-worker: VSEPipeline (`pipeline.py`, `worker.py`, `README.md`, `constitution.md`, `__init__.py`) — commity 7f0ed34, ad738a0, bc7732f, 62dfcf1, 4bcba15 (12.09.2026) [media-dev-C]
 - pressai-worker: AutoPublisher (`auto_publisher.py`, `worker.py`, `README.md`, `constitution.md`, `__init__.py`) — commity 9612364, 488fde4, 8baf6cc, 8d73de1, d3a1b7e (12.09.2026) [media-dev-B]
 - emisja-worker: CollabLinker (`collab_linker.py`, `worker.py`, `README.md`, `constitution.md`, `__init__.py`) (12.09.2026) [media-dev-D]
 - transcribe-worker: faster-whisper + VAD + CUDA + batch + dual PL/EN + --prompt (11.09.2026)
@@ -14,6 +15,5 @@
 ## 🟢 Następne
 - --extract-text do transcribe.py (30 min, odblokowuje PressAI)
 - Formalizacja shorts-agent z brain prototypu full_process_shorts.py
-- Formalizacja vse pipeline z brain prototypu execute_rulewski_pipeline.py
-- Constitutions dla kurier365, prawy-studio, prawy-youtube, vse-worker
+- Constitutions dla kurier365, prawy-studio, prawy-youtube
 - Dokumentacja architektoniczna: Grand Unified, Tutorial, SRT-Driven
