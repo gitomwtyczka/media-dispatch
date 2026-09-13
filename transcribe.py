@@ -13,6 +13,7 @@ Użycie:
     py -3.12 transcribe.py "plik.mp3" --prompt "Osowski, Płużański, Młodzież Wszechpolska, PRL"
     py -3.12 transcribe.py "plik.mp3" --extract-text  # dodatkowo zapisuje .pl.txt
     py -3.12 transcribe.py "D:\\katalog_z_plikami\\"  # tryb batch (cały katalog)
+    py -3.12 transcribe.py "plik.mp3" --post-translate he,yi  # tłumaczenie SRT przez Google Translate
 
 Wyjście: plik .srt w tym samym katalogu co plik wejściowy.
 """
@@ -102,6 +103,54 @@ def split_segment_by_words(segment, max_duration: float = 3.0, max_chars: int = 
                 chunks.append({"start": chunk_words[0].start, "end": chunk_words[-1].end, "text": text})
 
     return chunks if chunks else [{"start": segment.start, "end": segment.end, "text": segment.text.strip()}]
+
+
+def translate_srt(srt_path: Path, target_lang: str) -> Path:
+    """
+    Tłumaczy plik SRT na docelowy język przez Google Translate.
+    Zachowuje numery i znaczniki czasowe, tłumaczy tylko tekst.
+    Zwraca ścieżkę do nowego pliku.
+    """
+    try:
+        from deep_translator import GoogleTranslator
+    except ImportError:
+        print(f"[ERROR] Brak deep-translator: py -3.12 -m pip install deep-translator")
+        return None
+
+    output_path = srt_path.with_name(
+        srt_path.stem.replace('.pl', '').replace('.en', '') + f".{target_lang}.srt"
+    )
+
+    print(f"[INFO] Tłumaczenie {srt_path.name} → {target_lang}...")
+
+    translator = GoogleTranslator(source='auto', target=target_lang)
+
+    content = srt_path.read_text(encoding='utf-8')
+    blocks = content.strip().split('\n\n')
+
+    translated_blocks = []
+    for block in blocks:
+        lines = block.split('\n')
+        if len(lines) < 3:
+            translated_blocks.append(block)
+            continue
+
+        # Linia 0: numer, Linia 1: timestamp, Linia 2+: tekst
+        num = lines[0]
+        timestamp = lines[1]
+        text = ' '.join(lines[2:])
+
+        try:
+            translated_text = translator.translate(text)
+        except Exception as e:
+            print(f"[WARN] Błąd tłumaczenia bloku {num}: {e}")
+            translated_text = text
+
+        translated_blocks.append(f"{num}\n{timestamp}\n{translated_text}")
+
+    output_path.write_text('\n\n'.join(translated_blocks) + '\n', encoding='utf-8')
+    print(f"[OK] {target_lang}: {output_path.name}")
+    return output_path
 
 
 def transcribe(audio_path: str, model_size: str, language: str, use_cpu: bool,
@@ -270,6 +319,12 @@ def main():
         action="store_true",
         help="Zapisz też plik .txt z czystym tekstem (bez timestampów) — gotowy dla PressAI"
     )
+    parser.add_argument(
+        "--post-translate",
+        default="",
+        metavar="LANGS",
+        help="Języki do tłumaczenia SRT po transkrypcji, oddz. przecinkiem. Np. --post-translate he,yi"
+    )
 
     args = parser.parse_args()
 
@@ -313,6 +368,24 @@ def main():
             transcribe(args.audio, args.model, args.language, args.cpu,
                        task="transcribe", output_suffix=f".{args.language}", prompt=args.prompt,
                        extract_text=args.extract_text)
+
+    # Post-translate: tłumaczenie gotowego SRT na dodatkowe języki
+    if args.post_translate:
+        target_langs = [l.strip() for l in args.post_translate.split(',') if l.strip()]
+        if target_langs:
+            # Znajdź który SRT powstał
+            audio_p = Path(args.audio) if not Path(args.audio).is_dir() else None
+            if audio_p and audio_p.is_file():
+                source_srt = audio_p.with_name(audio_p.stem + f".{args.language}.srt")
+                if not source_srt.exists():
+                    # Fallback: prosty .srt bez sufiksu
+                    source_srt = audio_p.with_suffix('.srt')
+                if source_srt.exists():
+                    print(f"\n[INFO] Post-translate z: {source_srt.name}")
+                    for lang in target_langs:
+                        translate_srt(source_srt, lang)
+                else:
+                    print(f"[WARN] Nie znaleziono SRT do tłumaczenia: {source_srt}")
 
 
 if __name__ == "__main__":
