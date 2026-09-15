@@ -1,20 +1,15 @@
 {
   "callsign": "media-strateg",
-  "status": "czekam na GO",
-  "current_task": "Faza 1 kompletna — czekam na decyzję o testach workerów",
-  "timestamp": "2026-09-12T10:53:00+02:00",
+  "status": "done",
+  "current_task": "Thumbnail generator v9 + batch thumbnails dla 23 shortsów",
+  "timestamp": "2026-09-15T16:30:00+02:00",
   "last_completed": [
-    "shorts-agent: worker.py + scheduler.py (cd961dd, da39de2) [media-dev-A]",
-    "pressai-worker: auto_publisher.py + worker.py (9612364, 488fde4) [media-dev-B]",
-    "vse-worker: pipeline.py + worker.py (7f0ed34, ad738a0) [media-dev-C]",
-    "emisja-worker: collab_linker.py + worker.py (9808e4a, 6e8471) [media-dev-D]",
-    "transcribe-worker: faster-whisper + VAD + CUDA (3afe7ea)",
-    "Pełna archeologia: 106 sesji, ~90 skryptów"
+    "thumbnail_generator.py v9 — commit 4fbba22b (15.09.2026)",
+    "constitution.md +Thumbnail Pipeline — commit 7175c39b (15.09.2026)",
+    "3 próbne thumbnaile z MP4 — OK (antify, komisja, pomnik)"
   ],
   "pending": [
-    "Testy health_check() dla wszystkich 4 workerów",
-    "Rotacja sekretów (JWT, GitHub token, WP password)",
-    "--extract-text do transcribe.py",
-    "Faza 2: Dokumentacja architektoniczna"
+    "Batch thumbnail 23 shortów — wymaga session-based MP4 matching",
+    "Czyszczenie opisow @naszkanal — quota YT (sprawdz rano 09:00 CEST)"
   ]
 }
