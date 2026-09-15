@@ -1,15 +1,17 @@
 {
-  "callsign": "media-dev-G",
+  "callsign": "media-strateg",
   "status": "working",
-  "current_task": "Budowa biblia-worker: biblia_sheets_sync.py, worker.py, README, constitution, naprawa biblia_full_pipeline.py oraz DB fix",
-  "timestamp": "2026-09-12T17:23:00Z",
+  "current_task": "Full flow: Pełużański Popek Wołyń 1 + Pełużański Pietrzak — artykuł VSE + shorty (5 emotional/5 professional) + cięcie + prawy.pl + YT opisy",
+  "timestamp": "2026-09-15T20:40:00Z",
   "last_completed": [
-    "Poprzednia sesja media-dev-C zakończona"
+    "media-dev-G: biblia-worker budget",
+    "process_shorts_describe.py: opisy shortów YT (14.09.2026)"
   ],
   "pending": [
-    "Zadanie 1: Napraw agents/vse-worker/scripts/biblia_full_pipeline.py",
-    "Zadanie 2: Zbuduj agents/biblia-worker/biblia_sheets_sync.py",
-    "Zadanie 3: Zbuduj agents/biblia-worker/worker.py, README.md, constitution.md",
-    "Zadanie 4: Popraw nazwę kanału w bazie VSE"
+    "Phase 1: VSE artykuł + Short Machine generate dla 2x filmów",
+    "Phase 2: Cięcie shortów z MP4 (5 emotional + 5 professional per film)",
+    "Phase 3: Upload shortów na YT + opisy",
+    "Phase 4: Inject artykułów na prawy.pl",
+    "Phase 5: Update opisów długich filmów na YT"
   ]
 }
