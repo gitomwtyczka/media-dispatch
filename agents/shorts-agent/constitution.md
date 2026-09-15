@@ -190,6 +190,28 @@ Endpoint `/v1/youtube/channels` zwraca jedynie metadane kanału, bez `access_tok
 ### P8 — UUID portalu Prawy.pl
 `portal_id` musi być pełnym ciągiem UUID (`2b047d7d-15a1-4d2f-8463-f89c2275bb73`), a nie stringiem `"prawy"`.
 
+### P9 — Handle kanału: `@portalprawypl` (nie `@PrawyTV` ani `@naszkanal`)
+VSE Short Machine i LLM mogą generować placeholder `@naszkanal`. Zawsze używać `DEFAULT_CHANNEL_NAME = "@portalprawypl"` w worker.py. Wynik z LLM należy weryfikować i czyścić przed wstrzyknięciem na YouTube.
+
+### P10 — YouTube Data API Quota: 10 000 pkt/dzień, reset 09:00 CEST
+`videos.list` = 1 pkt, `videos.update` = 50 pkt. Przy paczce 23 shortów = describe (23) + update (23×50) + scheduler (23 GET + 23 PUT) ≈ 2500 pkt. Limit wyczerpuje się przy dużych porcjach. Reset o 09:00 CEST (midnight Pacific). Monitorować zużycie. Skrypt `clean_descriptions.py` trzymać na końcu kolejki.
+
+### P11 — OAuth re-autoryzacja przez VSE endpoint
+Jeśli `invalid_grant: Token has been expired or revoked` — użyj endpointu VSE:
+```bash
+curl -H 'Authorization: Bearer <JWT>' http://localhost:8085/v1/youtube/oauth/login
+# Zwraca authorization_url — otwórz w przeglądarce i zaloguj na prawypl5@gmail.com
+```
+CallbackURL: `https://vse.impresjapr.pl/v1/youtube/oauth/callback` — automatycznie zapisuje nowy refresh_token w bazie.
+
+### P12 — AME Log jako źródło prawdy: filename → YouTube ID
+Log Media Encoder: `C:\Users\tomas2\Documents\Adobe\Adobe Media Encoder\26.0\AMEEncodingLog.txt` (UTF-16LE)
+Zawiera mapowanie: nazwa pliku shortsa → YouTube Video ID. Czytać przez PowerShell:
+```powershell
+Get-Content 'C:\Users\tomas2\Documents\Adobe\Adobe Media Encoder\26.0\AMEEncodingLog.txt' -Tail 300 -Encoding Unicode
+```
+Użytkownik sygnalizuje gotową paczkę komendą: "sprawdź logi media encoder".
+
 ---
 
 ## 7. Raport po zakończeniu
@@ -216,12 +238,14 @@ Błędy i ostrzeżenia:
 # Lokalizacja: agents/shorts-agent/
 
 agents/shorts-agent/
-├── worker.py       # Główny silnik: describe (/v1/shorts/describe) + YT update
-├── scheduler.py    # Moduł planowania: privacyStatus: private + publishAt
-├── README.md       # Instrukcja obsługi, zmienne środowiskowe, CLI
-└── constitution.md # Zasady operacyjne, standardy i znane pułapki
+├── worker.py              # Główny silnik: describe + YT update
+├── scheduler.py           # Planowanie: privacyStatus: private + publishAt
+├── constitution.md        # Zasady operacyjne, standardy i znane pułapki
+├── scripts/
+│   └── clean_descriptions.py  # Czyszczenie @naszkanal → @portalprawypl w opisach YT
+└── README.md              # Instrukcja obsługi
 ```
 
 ---
 
-*Inicjacja: media-dev-A | 12.09.2026*
+*Zaktualizowano: media-dev-42 | 15.09.2026 — P9-P12, handle @portalprawypl, AME log workflow, OAuth reauth*
