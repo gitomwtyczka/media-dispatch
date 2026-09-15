@@ -249,3 +249,43 @@ agents/shorts-agent/
 ---
 
 *Zaktualizowano: media-dev-42 | 15.09.2026 — P9-P12, handle @portalprawypl, AME log workflow, OAuth reauth*
+
+
+## Thumbnail Pipeline (v9, finalny)
+
+### Stack
+- Pillow (lokalnie)
+- Font: NimbusSansNarrow-Bold.otf z branding kitu
+- Branding kit: `D:\Biblioteki\prawy video\!_shortsy identyfikacja 9x16\prawy-shorts-kit\`
+
+### Współrzędne (z PSD wzorcowego 1080x1920)
+| Element | left | top | right | bottom |
+|---|---|---|---|---|
+| Badge (01-overlay-staly) | 92 | 76 | 498 | 288 |
+| CTA (02-05 rotacyjnie) | 131 | 211 | 913 | 394 |
+| Apla (ciemny panel) | 0 | 664 | 1080 | 1759 |
+| Czerwona kreska | 105 | 664 | 116 | 1759 |
+| Strefa tytułu | 151 | 739 | 1017 | 1508 |
+| Strefa gości | 151 | 1629 | 942 | 1699 |
+
+### Tytuł — auto-fit
+Każde słowo hook_text osobna linia, auto-fit do max szerokości 866px.
+Font: bialy, stroke czarny 5px.
+
+### Goście — auto-fit
+Jedna linia, auto-fit do 791x70px. Kolor: #E31335.
+
+### Tło — priorytet URL
+1. `oar2.jpg` (pionowe YT thumb)
+2. `oardefault.jpg`
+3. `maxresdefault.jpg`
+4. Fallback: NAVY #07152B
+
+### Wywołanie
+```python
+from agents.shorts_agent.thumbnail_generator import generate_thumbnail
+path = generate_thumbnail('Ud39NRwg6bc', 'BRUKSELA DYKTUJE DIETY', 'PŁUŻAŃSKI — OSOWSKI', cta_idx=2)
+```
+
+### Output
+`C:\VSE\Shorts\thumbnails\{video_id}_thumbnail.jpg`
