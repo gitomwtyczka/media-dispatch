@@ -37,7 +37,7 @@ logger = logging.getLogger("shorts-worker")
 
 DEFAULT_VSE_URL = "http://localhost:8085"
 DEFAULT_PORTAL_ID = "2b047d7d-15a1-4d2f-8463-f89c2275bb73"
-DEFAULT_CHANNEL_NAME = "@PrawyTV"
+DEFAULT_CHANNEL_NAME = "@portalprawypl"
 DEFAULT_PROVIDER = "claude"
 
 _worker_state: Dict[str, Any] = {
@@ -420,7 +420,7 @@ def process(task: dict) -> dict:
             }
         ],
         "portal_id": "...",             # opcjonalnie, default z env
-        "channel_name": "@PrawyTV",     # opcjonalnie
+        "channel_name": "@portalprawypl",     # opcjonalnie
         "provider": "claude",           # opcjonalnie
         "insert_pinned_comment": False  # opcjonalnie
     }
