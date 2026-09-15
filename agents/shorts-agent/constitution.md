@@ -1,7 +1,7 @@
 # shorts-agent — Konstytucja
 
 > Plik dla agentów AI które wywołują shorts-agent.  
-> Ostatnia aktualizacja: 12.09.2026 | media-dev-A
+> Ostatnia aktualizacja: 15.09.2026 | media-strateg
 
 ---
 
@@ -212,9 +212,79 @@ Get-Content 'C:\Users\tomas2\Documents\Adobe\Adobe Media Encoder\26.0\AMEEncodin
 ```
 Użytkownik sygnalizuje gotową paczkę komendą: "sprawdź logi media encoder".
 
+### P13 — Hook text na thumbnail: max 4 SENSOWNE słowa
+Hook z VSE (candidate_data.hook_text) to pełne zdanie — za długie na thumbnail.
+Zasada: wybierz max 4 słowa które razem mają sens. NIE ucinaj mechanicznie pierwszych 4.
+
+Przykłady:
+- "Pakt Ribbentrop-Mołotow nie dotyczył tylko Polski" → `PAKT RIBBENTROP-MOŁOTOW`
+- "Komisja reprywatyzacyjna - PiS vs PO" → `KOMISJA REPRYWATYZACYJNA`
+- "Bruksela dyktuje diety jak ZSRR 50 lat temu" → `BRUKSELA DYKTUJE DIETY`
+
+Algorytm: preferuj optimized_title (krótszy). Jeśli za długi — weź kluczowe 4 słowa z hook_text.
+
+### P14 — Apla dynamiczna: rośnie w dół z tekstem
+APLA (ciemny panel) NIE ma stałego dolnego marginesu — rozszerza się z tytułem.
+Brak limitu wierszy — tytuł może mieć 5+ słów, apla podąża za nim.
+
+```python
+apla_bottom = max(1759, title_bottom + 60)
+redbar_bottom = apla_bottom
+guest_top = title_bottom + 20
+guest_bottom = title_bottom + 90
+```
+
+### P15 — VSE DB + AME log = dwuetapowy flow shortów
+
+**Etap 1 — VSE Short Machine renderuje short:**
+- Wynik zapisywany w `short_jobs`: `result_paths->>'raw'` = lokalna ścieżka MP4
+- Na tym etapie **NIE MA jeszcze** `yt_short_video_id` (nie było uploadu)
+
+**Etap 2 — User uploaduje z Premiere Pro na YouTube:**
+- YouTube przypisuje `video_id`
+- User informuje agenta: `"sprawdź logi media encoder"` = sygnał startu
+- **AME log** (`AMEEncodingLog.txt`, UTF-16LE) = oficjalny most między etapem 2 a systemem
+- Zawiera pary: `raw_mp4_filename → youtube_video_id` po uploadzie z Premiere
+
+**Fix architektoniczny po wykryciu sygnału "sprawdź logi ME":**
+1. Czytaj AME log (UTF-16LE) → wyciągnij pary: `raw_mp4_filename → yt_video_id`
+2. Matchuj z `short_jobs WHERE result_paths->>'raw' LIKE '%nazwa_pliku%'`
+3. Zapisz: `UPDATE short_jobs SET yt_short_video_id = yt_video_id WHERE id = matched_id`
+4. Dopiero potem: inject metadata na YouTube
+
+**Schema VSE DB (tabela short_jobs):**
+- `result_paths->>'raw'` = pełna ścieżka lokalna MP4 ✅
+- `candidate_data->>'hook_text'` = hook (pełne zdanie) ✅
+- `candidate_data->>'optimized_title'` = tytuł YT ✅
+- `youtube_id` = source video ID (NIE ID shorta!)
+- `yt_short_video_id` = ❌ GAP — brakuje! Do dodania:
+
+```sql
+ALTER TABLE short_jobs ADD COLUMN yt_short_video_id varchar(20);
+```
+
+**Query dla workera thumbnail:**
+```sql
+SELECT result_paths->>'raw' as mp4_path,
+       candidate_data->>'hook_text' as hook,
+       candidate_data->>'optimized_title' as title,
+       created_at
+FROM short_jobs
+WHERE status = 'done'
+  AND result_paths->>'raw' IS NOT NULL
+  AND created_at >= '2026-09-09'
+ORDER BY created_at;
+```
+
+**Flow docelowy:**
+```
+AME log → yt_video_id → match short_jobs → result_paths->>'raw' → ffmpeg t=5s → thumbnail
+```
+
 ---
 
 ## 7. Raport po zakończeniu
+
 
 Po przetworzeniu paczki shortów, agent raportuje do Supervisora (`media-strateg`):
 
