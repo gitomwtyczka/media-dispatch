@@ -18,7 +18,7 @@ Zawiera wiedzę zdobytą zarówno z poprzednich sesji jak i weryfikacji live 29-
 | Container Web | `vse-web` |
 | DB credentials | user=`vse`, db=`vse` |
 | VPS | `ubuntu@147.224.162.100` |
-| SSH key (pełna ścieżka Windows) | `C:\\Users\\tomas2\\.ssh\\oracle-crimson.key` |
+| SSH key (pełna ścieżka Windows) | `C:\Users\tomas2\.ssh\oracle-crimson.key` |
 | Dashboard | `https://vse.impresjapr.pl/dashboard` |
 
 ---
@@ -287,7 +287,7 @@ Znane pułapki:
 | 2 | URL: `/v1/` nie `/api/v1/` | Publiczny: `https://vse.impresjapr.pl/v1/...` |
 | 3 | `create_access_token()` psuje się | Używaj `jose.jwt.encode()` z `JWT_SECRET_KEY` |
 | 4 | SQL przez SSH z PS | Skrypt bash → `write_to_file` → `scp` pełna ścieżka → `ssh bash /tmp/...` |
-| 5 | SCP `~` na Windows | Pełna ścieżka: `C:\\Users\\tomas2\\...` |
+| 5 | SCP `~` na Windows | Pełna ścieżka: `C:\Users\tomas2\...` |
 | 6 | Whisper timeout | timeout=600s, nie przerywaj |
 | 7 | Audio pipeline ≠ pełny pipeline | Patrz sekcja 4 — architektura flow |
 | 8 | `invalid_grant` YT OAuth | Nie naprawiaj kodem, zgłoś do Supervisora |
@@ -321,8 +321,8 @@ print(jwt.encode(payload, secret, algorithm='HS256'))
 
 ### Poprawny SCP (Windows → VPS)
 ```powershell
-scp -i C:\\Users\\tomas2\\.ssh\\oracle-crimson.key -o StrictHostKeyChecking=no `
-  "C:\\Users\\tomas2\\.gemini\\antigravity\\playground\\sonic-void\\tmp\\skrypt.sh" `
+scp -i C:\Users\tomas2\.ssh\oracle-crimson.key -o StrictHostKeyChecking=no `
+  "C:\Users\tomas2\.gemini\antigravity\playground\sonic-void\tmp\skrypt.sh" `
   ubuntu@147.224.162.100:/tmp/skrypt.sh
 ```
 
@@ -360,9 +360,69 @@ data = r.json()
 | Typ publikacji WP | `full_analysis` (NIE `film`!) |
 | Lang | `pl` | LLM | `claude` (NIE `gemini`!) |
 | Publish time | 00:00 CEST (`+02:00`) danego dnia |
-| Pliki lokalne | `C:\\Users\\tomas2\\Videos\\Prawy\\Biblia [data]\\` (MP3 + MP4) |
-| Thumbnails lokalne | `D:\\Biblioteki\\prawy video\\Biblia\\Biblia [data]\\` |
+| Pliki lokalne | `C:\Users\tomas2\Videos\Prawy\Biblia [data]\` (MP3 + MP4) |
+| Thumbnails lokalne | `D:\Biblioteki\prawy video\Biblia\Biblia [data]\` |
 | Portal UUID | `2b047d7d-15a1-4d2f-8463-f89c2275bb73` |
+
+---
+
+## 11. Short Machine — Full Generation Pipeline
+
+### Endpoint generowania shortów
+```
+POST /v1/shorts/generate
+```
+
+Payload:
+```json
+{
+  "youtube_url": "https://www.youtube.com/watch?v={yt_id}",
+  "youtube_id": "{yt_id}",
+  "portal_id": "2b047d7d-15a1-4d2f-8463-f89c2275bb73",
+  "count_emotional": 5,
+  "count_professional": 5,
+  "local_path": "C:\\Users\\tomas2\\Videos\\Prawy\\{nazwa}.mp4",
+  "render_config": {"format": "9:16", "output_dir": "C:\\VSE\\Shorts"}
+}
+```
+
+### local_overrides.json
+- Ścieżka: `C:\ProgramData\VSELocalRunner\local_overrides.json`
+- Mapuje YT ID → lokalny plik MP4
+- Local Runner używa go do cięcia bez pobierania z YT
+
+### VSELocalRunner
+- Windows Service: `VSELocalRunner`
+- Polluje `GET /v1/shorts/pending` co 5 sekund
+- Output: `C:\VSE\Shorts\{nazwa_pliku}_{data}\{tytuł}_raw.mp4` + `_social.mp4`
+
+## 12. Wzorzec pracy z agentami (odkryty 15.09.2026)
+
+**Problem:** Workery background nie mogą wykonywać `run_command` (timeout approval).
+
+**Rozwiązanie — podział pracy:**
+```
+Worker (Gemini Pro):
+  → pisze skrypt Python
+  → push do GitHub (agents/*/scripts/)
+  → raportuje SHA do supervisora
+
+Supervisor:
+  → pobiera skrypt z GitHub MCP
+  → write_to_file lokalnie
+  → run_command: python skrypt.py
+  → odczytuje wyniki
+```
+
+**subprocess + polskie znaki (Windows CP1250):**
+```python
+# BŁĄD: text=True powoduje UnicodeDecodeError na CP1250
+r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+
+# POPRAWNIE: bytes + decode ręcznie
+r = subprocess.run(cmd, capture_output=True, timeout=30)
+output = r.stdout.decode('utf-8', errors='replace').strip()
+```
 
 ---
 
