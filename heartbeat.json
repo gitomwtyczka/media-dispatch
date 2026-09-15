@@ -1,17 +1,16 @@
 {
   "callsign": "media-strateg",
-  "status": "working",
-  "current_task": "Full flow: Pełużański Popek Wołyń 1 + Pełużański Pietrzak — artykuł VSE + shorty (5 emotional/5 professional) + cięcie + prawy.pl + YT opisy",
-  "timestamp": "2026-09-15T20:40:00Z",
+  "status": "done",
+  "current_task": "Full flow Pluzanski — sesja zamknięta",
+  "timestamp": "2026-09-15T21:10:00Z",
   "last_completed": [
-    "media-dev-G: biblia-worker budget",
-    "process_shorts_describe.py: opisy shortów YT (14.09.2026)"
+    "prawy_full_flow_pipeline.py — commit 56df556b (15.09.2026)",
+    "prawy_shorts_pipeline.py — commit 698c16cf (15.09.2026)",
+    "WP drafty: #126276 + #126281 na prawy.pl",
+    "YT opisy EWkRL1sEqQE + s6qif3Ed57E zaktualizowane",
+    "20 shortów wygenerowanych i wylądowanych w C:\\VSE\\Shorts\\"
   ],
   "pending": [
-    "Phase 1: VSE artykuł + Short Machine generate dla 2x filmów",
-    "Phase 2: Cięcie shortów z MP4 (5 emotional + 5 professional per film)",
-    "Phase 3: Upload shortów na YT + opisy",
-    "Phase 4: Inject artykułów na prawy.pl",
-    "Phase 5: Update opisów długich filmów na YT"
+    "Phase 3: user uploaduje shorty na YT → agent podpina opisy"
   ]
 }
