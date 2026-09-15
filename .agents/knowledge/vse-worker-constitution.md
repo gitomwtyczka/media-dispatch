@@ -426,6 +426,96 @@ output = r.stdout.decode('utf-8', errors='replace').strip()
 
 ---
 
+## 13. Struktura bazy danych VSE — tabele i kolumny (odkryto 15.09.2026)
+
+### Tabele (wynik `\dt` w kontenerze vse-postgres)
+```
+api_keys, app_settings, oauth_states, plans,
+short_candidate_sets, short_jobs, short_srt_packages,
+transcript_jobs, usage_logs, users, wp_portals, youtube_channels
+```
+
+### transcript_jobs (schema_data)
+- Kolumna do zapytań: `video_url` (nie `video_id`!)
+- Query wzorzec: `WHERE video_url LIKE '%{yt_id}%' ORDER BY created_at DESC LIMIT 1`
+- Pola w schema_data: `lead`, `chapters`, `tags`, `yt_title`, `seo_title`, `faq`, `quotes`, `wp_id`, `yt_url`, `image_data`
+- NIE ma: `youtube_description_body`, `youtube_description_hook` (te pola są tylko w API response)
+
+### youtube_channels
+| UUID | Nazwa | YouTube Channel ID |
+|------|-------|------------------|
+| 1d1f5783-... | VeriNarrMundo | UCJGgMtUhG1ILuyOKcL6JA_g |
+| 9ec1c7b8-... | Tomasz Brzozowski | UCIBzmtDQ1SrE0r7jtWbiTNw |
+| cdf73155-... | Studio Prawy_PL | UCoH2G9By4OX3kcLsc8lHgDw |
+| 776a3a65-... | Prawy TV | UCNXh5eIlMVxnUBpTMKUp4CA |
+
+### youtube_channels OAuth status (15.09.2026)
+- VeriNarrMundo: `invalid_grant` (wygasły token)
+- Tomasz Brzozowski: OK
+- Studio Prawy\_PL: OK
+- Prawy TV: OK
+
+## 14. YT Description — poprawna metoda (odkryto 15.09.2026)
+
+### Problem z publish-description
+`POST /v1/youtube/publish-description` sprawdza czy video należy do podanego kanału.
+Filmy na kanałach Prawy zarządzanych przez konto Tomasz Brzozowski zwracają
+`"error: channel not found or access denied"` dla wszystkich UUID w VSE.
+
+### Właściwa metoda: yt_desc_fix.py w kontenerze
+```bash
+# Skopiuj skrypt do kontenera i uruchom
+docker cp /tmp/yt_desc_fix.py vse-api:/app/yt_desc_fix.py
+docker exec -w /app vse-api python3 yt_desc_fix.py
+```
+
+Skrypt `agents/vse-worker/scripts/yt_desc_fix.py`:
+- Ładuje token Tomasz Brzozowski z bazy przez `_build_credentials(ch).refresh(Request())`
+- Pobiera schema_data z `transcript_jobs WHERE video_url LIKE '%{yt_id}%'`
+- Buduje opis z pól: `lead` + `chapters` (lista dictów) + `tags` + link WP
+- Aktualizuje przez `youtube.videos().update()` (NIE przez publish-description)
+
+### Budowanie opisu YT z transcript_jobs.schema_data
+```python
+# lead -> opis główny
+lead = schema.get("lead", "")
+
+# chapters -> lista dictów {"time": "00:00", "title": "..."}
+raw_chapters = schema.get("chapters", [])
+chapter_lines = [f"{c.get('time','')} {c.get('title','')}".strip() for c in raw_chapters if isinstance(c, dict)]
+chapters_str = "\n".join(chapter_lines)
+
+# tags -> lista stringów
+tags = schema.get("tags", [])
+hashtags_str = " ".join(f"#{t}" if not t.startswith("#") else t for t in tags)
+
+desc = f"{lead}\n\n{chapters_str}\n\n{hashtags_str}\n\nCzytaj wiecej: {wp_url}"
+```
+
+## 15. Transcript Guard — zabezpieczenie przed hallucynacją (od prawy_full_flow_v2.py)
+
+```python
+resp = requests.post(f"{VSE_BASE}/v1/generate", ...)
+if resp.status_code == 200:
+    resp_json = resp.json()
+    transcript_ok = resp_json.get("transcript_available", True)
+    schema = resp_json.get("schema_data", {})
+    # Sprawdz również w schema_data
+    transcript_ok = transcript_ok and schema.get("transcript_available", True)
+    
+    if not transcript_ok:
+        print("BRAK TRANSKRYPTU - nie inject, czekaj 30 min i ponawia")
+        # NIE wywołuj /v1/inject!
+    else:
+        # Proceed normalnie
+        step_inject(schema, yt_url, token)
+```
+
+YouTube generuje napisy automatycznie (do 30 min po uplodzie).
+Jeśli VSE nie ma transkryptu → powróć za 30 min i ponownie wywołaj `/v1/generate`.
+
+---
+
 *[media-strateg-01 | media-dispatch 29.08.2026 — init]*  
 *[Supervisor 01 | sonic-void 29.08.2026 — pułapki live]*  
 *[Supervisor 01 | sonic-void 30.08.2026 — architektura audio vs YT pipeline, OAuth rotation, retrofitting thumbnails]*  
