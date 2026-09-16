@@ -31,10 +31,15 @@
 - **Worker anti-pattern**: Zamiast skupić się na wykonaniu przygotowanego skryptu (uruchomienie go w odpowiednim kontenerze i zebranie wyników), workerzy zaczęli zagłębiać się w kod (np. parsowanie/czytanie kodu VSE za pomocą grep/sed). Przez to tracili kontekst i nie byli w stanie dokończyć właściwego prostego zadania wykonania kodu i zaktualizowania API.
 - **Błędne nazwy kolumn modeli**: Próba użycia `ch.channel_id` czy `ch.client_id` zamiast prawidłowego `ch.youtube_channel_id` rzucała `AttributeError`.
 
-## 3. YOUTUBE — OTWARTA KWESTIA
-- **Co próbowano**: Próbowano aktualizować opisy i status używając bezpośrednio `requests.put` z raw tokenem, a potem budując poświadczenia wewn. skryptami. Worker podjął próbę wylistowania playlisty za pomocą _build_credentials, ale finalna aktualizacja się nie powiodła.
-- **Co powinno działać**: Najlepiej użyć endpointu VSE `POST /v1/youtube/publish-description`, autoryzując się za pomocą VSE JWT (z konta tobroz@gmail.com). Endpoint automatycznie obsłuży uwierzytelnienie w YouTube API za pomocą mechanizmów VSE, dbając o tokeny (odświeżanie) na podstawie zintegrowanych sesji. Alternatywą jest poprawne użycie `api.core.youtube_publish._build_credentials` do odświeżenia tokena wprost z wewnątrz kontenera `vse-api`.
-- **Co jeszcze trzeba zrobić**: Wszystkie 5 filmów (np. AMd9euz4dvM, vNoDWfjXHIU, itd.) jest nadal w stanie **Niepubliczny (unlisted)** na YouTube. Należy odświeżyć ich opis i ustawić widoczność na Publiczną / zaplanować na konkretne daty.
+## 3. YOUTUBE — OTWARTA KWESTIA / STATUS
+- **Aktualny status**: Worker `cb521820` ostatecznie **zakończył się sukcesem**. Rzeczywisty wynik z bezpośredniej weryfikacji API (`videos().list`) potwierdza, że filmy zostały opublikowane / zaplanowane:
+  - `AMd9euz4dvM` | public | None
+  - `vNoDWfjXHIU` | public | None
+  - `2IB0AXXhagk` | private | 2026-09-17T05:00:01Z (scheduled)
+  - `-z8X2PEuW34` | private | 2026-09-18T05:00:01Z (scheduled)
+  - `0rGHXiSVM-4` | private | 2026-09-19T05:00:01Z (scheduled)
+- **Co próbowano (zanim zadziałało)**: Próbowano aktualizować opisy i status używając bezpośrednio `requests.put` z raw tokenem, a potem budując poświadczenia wewn. skryptami. Worker podjął próbę wylistowania playlisty za pomocą _build_credentials, co początkowo sprawiało problemy przez nieznajomość modelu, ale ostatecznie pipeline zadziałał prawidłowo.
+- **Co powinno działać na przyszłość**: Najlepiej użyć endpointu VSE `POST /v1/youtube/publish-description`, autoryzując się za pomocą VSE JWT (z konta tobroz@gmail.com). Endpoint automatycznie obsłuży uwierzytelnienie w YouTube API za pomocą mechanizmów VSE, dbając o tokeny (odświeżanie) na podstawie zintegrowanych sesji. Alternatywą jest poprawne użycie `api.core.youtube_publish._build_credentials` (tak jak zrobiono to w ostatecznej udanej próbie).
 
 ## 4. DISPATCH TEMPLATE NA PRZYSZŁOŚĆ
 **Lokalizacja pipeline'ów**: Repozytorium `media-dispatch`, ścieżka `agents/vse-worker/scripts/`.
@@ -58,6 +63,7 @@ Skrypt do uruchomienia to `biblia_full_pipeline.py` (lub w razie backlogu `bibli
 3. Wywoływanie poleceń SSH w PowerShellu: Nie łącz komend przy użyciu `&&`. Wykonuj krok po kroku.
 4. Token YT (`access_token`) wygasa! Nie wklejaj go jako statyczny string, zawsze korzystaj z VSE API `/v1/youtube/publish-description` (używając VSE JWT) lub wykorzystaj wbudowany moduł VSE `api.core.youtube_publish._build_credentials`.
 5. Portal ID to ZAWSZE UUID (`2b047d7d-15a1-4d2f-8463-f89c2275bb73`), nie używaj aliasów stringowych (np. "prawy"). LLM Provider to `claude`.
+6. Channel ID: Prawidłowy kanał dla edycji materiałów Biblii to **Prawy TV** (`UCNXh5eIlMVxnUBpTMKUp4CA`), NIE Studio Prawy_PL (`UCoH2G9By4OX3kcLsc8lHgDw`). Użycie złego kanału przy aktualizacjach zablokuje wykonanie kodu.
 ```
 
 ## 5. ZNANE PUŁAPKI (gotowy blok do wklejenia w dispatche)
@@ -68,4 +74,5 @@ Skrypt do uruchomienia to `biblia_full_pipeline.py` (lub w razie backlogu `bibli
 3. **SSH w PS**: Jeden krok na raz przez SSH — nie łącz komend przez `&&`.
 4. **Tokeny YouTube**: Raw `access_token` wygasa po 1h. Używaj VSE endpointu `/v1/youtube/publish-description` z JWT (VSE ogarnie YT) lub metody `_build_credentials()` z wnętrza kontenera.
 5. **Parametry VSE**: `portal_id` to UUID (`2b047d7d-15a1-4d2f-8463-f89c2275bb73`), a `llm_provider` to `claude` (brak gemini na VPS).
+6. **Channel ID**: Prawidłowy kanał dla Biblii to **Prawy TV** (`UCNXh5eIlMVxnUBpTMKUp4CA`). NIE używaj `UCoH2G9By4OX3kcLsc8lHgDw` (Studio Prawy_PL).
 ```
