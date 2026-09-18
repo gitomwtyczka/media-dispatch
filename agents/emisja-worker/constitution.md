@@ -124,25 +124,60 @@ task = {
 
 ## 5. Integracja z pipeline media-dispatch
 
+### Miejsce emisja-worker w architekturze
+
+emisja-worker jest **Warstwą 2 (Editorial)** — uruchamia się po tym, gdy Warstwa 3 (Production) dostarczy draft WP.
+
 ```
-[VSE / PressAI]
+[vse-worker — Warstwa 3 Production]
+  → /v1/generate  (SEO, artykuł)
+  → /v1/inject    (WP draft → zwraca wp_post_id)
+  → YT metadata update
        │
-       ▼ (wstrzykuje artykuł)
-[WordPress Draft (post_id)]
-       │
-       ▼ (zapisuje URL draftu)
-[Google Sheets: Zakładka "Emisja" (kolumna "WP Draft URL")]
-       │
-       ▼
-[emisja-worker / CollabLinker]
-  ├── Odczyt komórek z GridData (formuły =HYPERLINK i parametry URL)
-  ├── Weryfikacja/utworzenie kolumny "Link draft"
-  ├── Wywołanie WP REST API draft-collab
-  └── Zapis linku wsadowo (batchUpdate) do kolumny "Link draft"
-       │
-       ▼
-[Redaktor Naczelny / Korektor / Autorzy] (podgląd i akceptacja bez konta WP)
+       ▼ HANDOFF — przekazuje wp_post_id
+[emisja-worker — Warstwa 2 Editorial]
+  → draft-collab link (POST /wp-json/draft-collab/v1/generate)
+  → zapis do Google Sheets (zakładka "Emisja", kolumna "Link draft")
+  → redaktor/korektor/autor dostaje link podglądu (bez konta WP)
 ```
+
+### Trigger emisja-worker
+
+Wejście dla emisja-worker pochodzi z raportu vse-worker:
+
+```python
+# Dane z handoffu vse-worker
+task = {
+    "wp_post_id": 12345,               # z step_inject response
+    "wp_edit_url": "https://prawy.pl/wp-admin/post.php?post=12345&action=edit",
+    "sheet_id": "1zqwvS784EaZh1EJIcXk1DliAau1r4X15ENFJjloDSaM",
+    "sheet_name": "Emisja",
+    "collab_email": "tobroz@gmail.com",
+    "dry_run": False
+}
+```
+
+### Tryby wywołania
+
+1. **Manualny (obecnie)** — Supervisor dispatchuje emisja-worker po otrzymaniu raportu od vse-worker z `wp_post_id`
+2. **Automatyczny (Faza 2)** — vse-worker wywołuje emisja-worker bezpośrednio po sukcesie inject
+
+### Kompletny pipeline end-to-end
+
+```
+video URL
+  → vse-worker (generate + inject + YT + shorts)
+  → [wp_post_id]
+  → emisja-worker (collab link + Sheets)
+  → redaktor w Sheets widzi: tytuł | link do YT | link do draftu WP | status
+  → akceptacja → publikacja (ręcznie lub przez scheduler)
+```
+
+### Status (18.09.2026)
+
+- ✅ Architektura zdefiniowana i przetestowana (Halwa Leo, Halwa Wójcik 2)
+- ✅ Oba workery zbudowane i w repo
+- 🔵 Automatyczny trigger — Faza 2 integracji
 
 ---
 
