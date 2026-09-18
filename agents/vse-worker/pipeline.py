@@ -493,7 +493,7 @@ print(jwt.encode(payload, secret, algorithm='HS256'))
                                     "end_sec": c.get("end_sec"),
                                     "local_path": local_path,
                                     "status": "submitted"
-                                })\
+                                })
                             else:
                                 render_jobs.append({
                                     "title": c.get("title"),
