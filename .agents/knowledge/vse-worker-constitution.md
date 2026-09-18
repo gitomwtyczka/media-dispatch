@@ -521,3 +521,12 @@ Jeśli VSE nie ma transkryptu → powróć za 30 min i ponownie wywołaj `/v1/ge
 *[Supervisor 01 | sonic-void 30.08.2026 — architektura audio vs YT pipeline, OAuth rotation, retrofitting thumbnails]*  
 *[media-strateg | media-dispatch 30.08.2026 — pułapki 11-14: llm_provider=claude, publication_type=full_analysis, portal_id UUID, YT token przez SSH _build_credentials]*  
 *[media-dev-12 | media-dispatch 31.08.2026 — sekcja Short Machine API (/v1/shorts/describe) na produkcji, pułapki 15-18]*
+
+---
+
+## Konto VSE — zawsze tobroz@gmail.com
+
+- USER_ID: `4b97ab0c-98ee-46c6-9be8-d86adc4cb38a`
+- Email: `tobroz@gmail.com`
+- OAuth: podpięte kanały Studio Prawy_PL (`UCoH2G9By4OX3kcLsc8lHgDw`) i Prawy Biblijny (`UCNXh5eIlMVxnUBpTMKUp4CA`)
+- Zakaz używania innych kont do operacji VSE
