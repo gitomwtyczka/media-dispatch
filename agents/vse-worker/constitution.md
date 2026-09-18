@@ -230,3 +230,119 @@ handoff = {
 - ✅ Architektura zdefiniowana i przetestowana
 - ✅ Oba workery zbudowane i w repo
 - 🔵 Automatyczny trigger (vse → emisja bez Supervisora) — Faza 2 integracji
+
+---
+
+## 9. Kanoniczne wywołanie — bez ad-hoc skryptów
+
+> Zasada: NIE tworzyć jednorazowych skryptów (halwa_pipeline.py, full_flow_vX.py itp.).
+> Zawsze używać `agents/vse-worker/worker.py` jako jedynego punktu wejścia.
+
+### Wywołanie na VPS
+
+```bash
+# Jeden film
+ssh -i C:\Users\tomas2\.ssh\oracle-crimson.key -o StrictHostKeyChecking=no ubuntu@147.224.162.100 \\
+  "cd /home/ubuntu/media-dispatch && python3 agents/vse-worker/worker.py --video-id z2ZlzcNsNwQ"
+
+# Diagnostyka
+python3 agents/vse-worker/worker.py --health
+python3 agents/vse-worker/worker.py --status
+
+# Selektywne kroki (np. tylko Short Machine)
+python3 agents/vse-worker/worker.py --video-id z2ZlzcNsNwQ --steps 4
+
+# Pełny pipeline z local_path (render shortów)
+python3 agents/vse-worker/worker.py --video-id z2ZlzcNsNwQ --local-path /home/ubuntu/VSE/input/film.mp4
+```
+
+### Parametry CLI
+
+| Parametr | Opis |
+|----------|------|
+| `--video-id` | YouTube ID (11 znaków) |
+| `--video-url` | Pełny URL YouTube |
+| `--steps` | Np. `1,2,3,4` (domyślnie wszystkie) |
+| `--local-path` | Lokalna ścieżka MP4 (dla render shortów) |
+| `--portal-id` | Override portal UUID |
+| `--channel-id` | Override channel ID |
+| `--health` | Sprawdź połączenie VSE + JWT |
+| `--status` | Stan ostatniego zadania |
+
+---
+
+## 10. Short Machine — Faza 2 (po uploadzie shortów)
+
+### Kontekst
+
+Krok 4 pipeline'u (`/v1/shorts/candidates`) generuje kandydatów w VSE dashboard.
+Użytkownik obrabia kandydatów w Premiere i uploaduje na YouTube ręcznie.
+Po uploadzie — agent czyta logi Adobe Media Encoder i wywołuje `shorts/describe`.
+
+### Trigger Fazy 2
+
+Użytkownik mówi: „uploadołem shorty, YT IDs: [lista]”
+
+### Flow Fazy 2
+
+```
+User: "uploadowane shorty, YT IDs: [ABC123, DEF456]"
+  │
+  ├─► Parsuj logi AME: C:\Users\tomas2\Documents\Adobe\Adobe Media Encoder\26.0\AMEEncodingLog.txt
+  │   (encoding: UTF-16LE, skrypt: parse_ame_log.py)
+  │   → mapuje pliki exportów → ścieżki w C:\VSE\Shorts\\
+  │
+  └─► POST /v1/shorts/describe dla każdego shorta:
+      payload: {"youtube_id": "[YT ID shorta]", "portal_id": "2b047d7d-15a1-4d2f-8463-f89c2275bb73"}
+      → aktualizuje tytuł, opis, tagi, pinned comment na YT
+```
+
+### Zasady Fazy 2
+
+- Zachowaj `privacy` i `publishAt` — nie nadpisuj zaplanowanej emisji
+- Tagi format: `#tag` (z hashtagiem)
+- Pinned comment: opcjonalnie przez `commentThreads().insert`
+- Skrypt referencyjny: `agents/shorts-agent/worker.py` (process_shorts_describe)
+
+### Parametry
+
+- AME log: `C:\Users\tomas2\Documents\Adobe\Adobe Media Encoder\26.0\AMEEncodingLog.txt` (UTF-16LE)
+- Shorty eksport: `C:\VSE\Shorts\<Nazwa projektu>_YouTube_<Data>\`
+- Endpoint: `POST http://localhost:8085/v1/shorts/describe`
+- PORTAL_ID: `2b047d7d-15a1-4d2f-8463-f89c2275bb73`
+
+---
+
+## 11. Architektura dwóch workerów — pełny end-to-end flow
+
+```
+Użytkownik: "nowe wideo: [YouTube ID]"
+       │
+       ▼
+vse-worker
+  ├─ Krok 1: /v1/generate (SEO, artykuł, rozdziały)
+  ├─ Krok 2: /v1/inject → WP draft [wp_post_id]
+  ├─ Krok 3: YT metadata update (tytuł + opis + link WP)
+  └─ Krok 4: /v1/shorts/candidates → VSE Short Machine dashboard
+       │
+       ▼ [wp_post_id]
+emisja-worker
+  ├─ draft-collab link → link do podglądu bez konta WP
+  └─ zapis do Google Sheets (zakładka "Emisja") → redaktor
+       │
+       ▼ [user obrabia shorty w Premiere, uploaduje na YT]
+vse-worker (Faza 2 — shorts/describe)
+  └─ logi AME → POST /v1/shorts/describe → opisy na YT shorts
+       │
+       ▼
+Publikacja (ręcznie lub scheduler)
+```
+
+### Trigger-chain
+
+| Etap | Trigger | Worker |
+|------|---------|--------|
+| Nowe wideo na YT | User mówi YT ID | vse-worker |
+| WP draft gotowy | Automatyczny po Kroku 2 | emisja-worker |
+| Shorty uploadowane | User mówi YT IDs shortów | vse-worker Faza 2 |
+| Publikacja | Akceptacja w Sheets | scheduler |
