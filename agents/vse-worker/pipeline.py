@@ -263,6 +263,7 @@ print(jwt.encode(payload, secret, algorithm='HS256'))
         }
 
         schema_data: Dict[str, Any] = task.get("schema_data", {})
+        generation_id: str = task.get("generation_id", "")
         wp_post_url: str = task.get("wp_post_url", "")
         wp_post_id: Optional[int] = task.get("wp_post_id")
 
@@ -294,11 +295,17 @@ print(jwt.encode(payload, secret, algorithm='HS256'))
                 if resp_gen.status_code == 200:
                     gen_json = resp_gen.json()
                     schema_data = gen_json.get("schema_data", {})
+                    generation_id = (
+                        gen_json.get("id") or
+                        gen_json.get("generation_id") or
+                        gen_json.get("job_id") or ""
+                    )
                     result["step1_generate"] = {
                         "status": "ok",
                         "status_code": resp_gen.status_code,
                         "schema_data": schema_data
                     }
+                    result["step1_generate"]["generation_id"] = generation_id
                 else:
                     result["step1_generate"] = {
                         "status": "error",
@@ -325,11 +332,14 @@ print(jwt.encode(payload, secret, algorithm='HS256'))
             else:
                 logger.info(f"[2/4] POST /v1/inject do WordPress (post_status='draft')...")
                 inject_payload = {
-                    "portal_id": portal_id,
-                    "video_url": video_url,
-                    "schema_data": schema_data,
-                    "post_status": "draft"  # REGUŁA BEZWZGLĘDNA: ZAWSZE draft
+                    "generation_id": generation_id,
+                    "post_status": "draft",  # REGUŁA BEZWZGLĘDNA: ZAWSZE draft
+                    "portal_id": portal_id
                 }
+                if not generation_id:
+                    # fallback: legacy
+                    inject_payload["schema_data"] = schema_data
+                    inject_payload["video_url"] = video_url
 
                 try:
                     resp_inj = requests.post(
@@ -363,173 +373,48 @@ print(jwt.encode(payload, secret, algorithm='HS256'))
                     result["status"] = "error"
 
         # =========================================================================
-        # KROK 3: Update YouTube metadata (ZAWSZE privacyStatus='unlisted')
+        # KROK 3: POST /v1/youtube/publish-description (VSE obsługuje YT wewnętrznie)
         # =========================================================================
         if 3 in steps:
-            logger.info(f"[3/4] Update YouTube metadata dla {video_id} (privacyStatus='unlisted')...")
-            yt_payload = {
-                "channel_id": channel_id,
-                "video_id": video_id,
-                "wp_post_url": wp_post_url or "",
-                "schema_data": schema_data
-            }
-            b64_yt_payload = base64.b64encode(
-                json.dumps(yt_payload, ensure_ascii=False).encode("utf-8")
-            ).decode("ascii")
-
-            yt_update_script = f"""
-import asyncio
-import base64
-import json
-import sys
-from api.db import AsyncSessionLocal
-from api.models.youtube_channel import YouTubeChannel
-from api.core.youtube_publish import _build_credentials
-from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
-from sqlalchemy.future import select
-
-async def main():
-    raw_payload = base64.b64decode("{b64_yt_payload}").decode("utf-8")
-    payload = json.loads(raw_payload)
-
-    target_channel_id = payload.get("channel_id")
-    video_id = payload.get("video_id")
-    wp_url = payload.get("wp_post_url", "")
-    schema = payload.get("schema_data", {{}})
-
-    async with AsyncSessionLocal() as db:
-        # 1. Pobierz kanał z DB
-        ch = None
-        if target_channel_id:
-            res = await db.execute(select(YouTubeChannel).where(YouTubeChannel.youtube_channel_id == target_channel_id))
-            ch = res.scalars().first()
-        if not ch:
-            res_active = await db.execute(select(YouTubeChannel).where(YouTubeChannel.is_active == True))
-            ch = res_active.scalars().first()
-
-        if not ch:
-            print(json.dumps({{"error": "Brak aktywnego rekordu YouTubeChannel w bazie VSE"}}))
-            return
-
-        creds = _build_credentials(ch)
-        creds.refresh(Request())
-        yt = build('youtube', 'v3', credentials=creds)
-
-        # 2. Buduj opis filmu
-        desc_parts = []
-        hook = schema.get('youtube_description_hook', '')
-        body = schema.get('youtube_description_body', '')
-        if hook:
-            desc_parts.append(hook)
-        if body:
-            desc_parts.append(body)
-
-        if wp_url:
-            desc_parts.append(f"🔗 Pełny artykuł: {{wp_url}}")
-
-        mid_cta = schema.get('youtube_mid_cta', '')
-        if mid_cta:
-            desc_parts.append(mid_cta)
-
-        chapters = schema.get('chapters', [])
-        if chapters:
-            ch_lines = []
-            for item in chapters:
-                t = item.get('time', 0)
-                mins = int(t // 60)
-                secs = int(t % 60)
-                ch_lines.append(f"{{mins:02d}}:{{secs:02d}} {{item.get('label', '')}}")
-            desc_parts.append("ROZDZIAŁY:\\n" + "\\n".join(ch_lines))
-
-        credits = schema.get('youtube_credits', {{}})
-        if credits:
-            cr_lines = []
-            if credits.get('host'):
-                cr_lines.append(f"Prowadzący: {{credits.get('host')}}")
-            if credits.get('guest'):
-                cr_lines.append(f"Gość: {{credits.get('guest')}}")
-            if credits.get('material_type'):
-                cr_lines.append(f"Typ materiału: {{credits.get('material_type')}}")
-            if cr_lines:
-                desc_parts.append("\\n".join(cr_lines))
-
-        tags = schema.get('tags', [])
-        hashtags = schema.get('youtube_hashtags', [])
-        if hashtags:
-            desc_parts.append(" ".join(hashtags))
-        elif tags:
-            desc_parts.append(" ".join([f"#{{t.replace(' ', '')}}" for t in tags[:5]]))
-
-        full_desc = "\\n\\n".join(desc_parts)
-        title = schema.get('yt_title') or schema.get('seo_title') or schema.get('post_title') or ''
-        if len(title) > 100:
-            title = title[:97] + '...'
-
-        vid_res = yt.videos().list(part='snippet,status', id=video_id).execute()
-        if not vid_res.get('items'):
-            print(json.dumps({{"error": f"Film {{video_id}} nie został znaleziony na YouTube"}}))
-            return
-
-        item = vid_res['items'][0]
-        cat_id = item['snippet'].get('categoryId', '25')
-
-        update_body = {{
-            'id': video_id,
-            'snippet': {{
-                'title': title or item['snippet'].get('title', ''),
-                'description': full_desc,
-                'tags': tags,
-                'categoryId': cat_id,
-                'defaultLanguage': 'pl',
-                'defaultAudioLanguage': 'pl'
-            }},
-            'status': {{
-                'privacyStatus': 'unlisted',  # REGUŁA BEZWZGLĘDNA: ZAWSZE unlisted!
-                'selfDeclaredMadeForKids': False
-            }}
-        }}
-
-        update_res = yt.videos().update(part='snippet,status', body=update_body).execute()
-        print(json.dumps({{
-            "status": "ok",
-            "title": update_res['snippet']['title'],
-            "privacyStatus": update_res['status']['privacyStatus']
-        }}))
-
-asyncio.run(main())
-"""
-            try:
-                res_yt = self._exec_container_script(yt_update_script, timeout=60)
-                parsed_yt = None
-                for line in res_yt.stdout.strip().splitlines():
-                    try:
-                        parsed_candidate = json.loads(line)
-                        if isinstance(parsed_candidate, dict) and ("status" in parsed_candidate or "error" in parsed_candidate):
-                            parsed_yt = parsed_candidate
-                            break
-                    except json.JSONDecodeError:
-                        continue
-
-                if parsed_yt and parsed_yt.get("status") == "ok":
-                    result["step3_yt_update"] = {
-                        "status": "ok",
-                        "title": parsed_yt.get("title"),
-                        "privacyStatus": parsed_yt.get("privacyStatus", "unlisted")
-                    }
-                else:
-                    err = (parsed_yt.get("error") if parsed_yt else None) or res_yt.stderr.strip() or res_yt.stdout.strip()
+            logger.info(f"[3/4] POST /v1/youtube/publish-description dla {video_id}...")
+            if not generation_id:
+                result["step3_yt_update"] = {
+                    "status": "skipped",
+                    "error": "Brak generation_id — wykonaj krok 1 najpierw"
+                }
+            else:
+                pub_payload = {
+                    "generation_id": generation_id,
+                    "wp_post_id": wp_post_id,
+                    "channel_ids": [channel_id],
+                    "portal_id": portal_id
+                }
+                try:
+                    resp_pub = requests.post(
+                        f"{self.vse_url}/v1/youtube/publish-description",
+                        headers=headers,
+                        json=pub_payload,
+                        timeout=120
+                    )
+                    if resp_pub.status_code == 200:
+                        result["step3_yt_update"] = {
+                            "status": "ok",
+                            "status_code": resp_pub.status_code,
+                            "response": resp_pub.json() if resp_pub.text else {}
+                        }
+                    else:
+                        result["step3_yt_update"] = {
+                            "status": "error",
+                            "status_code": resp_pub.status_code,
+                            "error": resp_pub.text[:500]
+                        }
+                        result["status"] = "error"
+                except Exception as e:
                     result["step3_yt_update"] = {
                         "status": "error",
-                        "error": err or "Błąd aktualizacji metadanych YouTube"
+                        "error": str(e)
                     }
                     result["status"] = "error"
-            except Exception as e:
-                result["step3_yt_update"] = {
-                    "status": "error",
-                    "error": str(e)
-                }
-                result["status"] = "error"
 
         # =========================================================================
         # KROK 4: POST /v1/shorts/candidates & POST /v1/shorts/render
@@ -608,7 +493,7 @@ asyncio.run(main())
                                     "end_sec": c.get("end_sec"),
                                     "local_path": local_path,
                                     "status": "submitted"
-                                })
+                                })\
                             else:
                                 render_jobs.append({
                                     "title": c.get("title"),
