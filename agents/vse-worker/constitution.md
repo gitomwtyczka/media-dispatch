@@ -67,38 +67,7 @@ task = {
 ### Wyjście: format odpowiedzi
 
 ```json
-{
-  "status": "ok",
-  "step1_generate": {
-    "status": "ok",
-    "status_code": 200,
-    "schema_data": { ... }
-  },
-  "step2_inject": {
-    "status": "ok",
-    "status_code": 200,
-    "wp_post_id": 12345,
-    "post_url": "https://prawy.pl/?p=12345"
-  },
-  "step3_yt_update": {
-    "status": "ok",
-    "title": "Tytuł filmu",
-    "privacyStatus": "unlisted"
-  },
-  "step4_shorts": {
-    "status": "ok",
-    "candidates": [ ... ],
-    "render_jobs": [
-      {
-        "job_id": "job_987",
-        "title": "Fragment...",
-        "start_sec": 15.0,
-        "end_sec": 50.0,
-        "status": "submitted"
-      }
-    ]
-  }
-}
+{\n  "status": "ok",\n  "step1_generate": {\n    "status": "ok",\n    "status_code": 200,\n    "schema_data": { ... }\n  },\n  "step2_inject": {\n    "status": "ok",\n    "status_code": 200,\n    "wp_post_id": 12345,\n    "post_url": "https://prawy.pl/?p=12345"\n  },\n  "step3_yt_update": {\n    "status": "ok",\n    "title": "Tytuł filmu",\n    "privacyStatus": "unlisted"\n  },\n  "step4_shorts": {\n    "status": "ok",\n    "candidates": [ ... ],\n    "render_jobs": [\n      {\n        "job_id": "job_987",\n        "title": "Fragment...",\n        "start_sec": 15.0,\n        "end_sec": 50.0,\n        "status": "submitted"\n      }\n    ]\n  }\n}
 ```
 
 ---
@@ -174,3 +143,58 @@ Wyniki:
 
 Błędy / Uwagi: <szczegóły jeśli wystąpiły>
 ```
+
+---
+
+## 8. Handoff do emisja-worker — architektura
+
+> Zasada: vse-worker produkuje. emisja-worker wprowadza do redakcji.
+
+### Punkt handoffu
+
+Po zakończeniu Kroku 2 (`/v1/inject`) vse-worker posiada:
+- `wp_post_id` — ID wpisu WordPress
+- `wp_edit_url` — URL edycji draftu w WP Admin
+
+Te dane są **wejściem do emisja-worker**.
+
+### Flow
+
+```
+vse-worker
+  Krok 1: /v1/generate → SEO + artykuł
+  Krok 2: /v1/inject   → WP draft (zwraca wp_post_id + wp_edit_url)
+  Krok 3: YT metadata update
+  Krok 4: Short Machine
+       │
+       ▼ HANDOFF (przekazuje wp_post_id)
+  emisja-worker
+    → draft-collab link (wtyczka WP)
+    → zapis do Sheets zakładka "Emisja"
+    → redaktor/korektor dostaje link bez konta WP
+```
+
+### Trigger emisja-worker
+
+emisja-worker jest wywoływany:
+- **Automatycznie** — gdy vse-worker zakończy pipeline z sukcesem (przyszła integracja)
+- **Manualnie** — Supervisor dispatchuje emisja-worker podając `wp_post_id` z raportu vse-worker
+
+### Dane przekazywane
+
+```python
+# Wyjście vse-worker (wejście emisja-worker)
+handoff = {
+    "wp_post_id": 12345,
+    "wp_edit_url": "https://prawy.pl/wp-admin/post.php?post=12345&action=edit",
+    "portal_id": "2b047d7d-15a1-4d2f-8463-f89c2275bb73",
+    "video_id": "z2ZlzcNsNwQ",
+    "title": "Tytuł materiału"
+}
+```
+
+### Status (12.09.2026)
+
+- ✅ Architektura zdefiniowana i przetestowana
+- ✅ Oba workery zbudowane i w repo
+- 🔵 Automatyczny trigger (vse → emisja bez Supervisora) — Faza 2 integracji
