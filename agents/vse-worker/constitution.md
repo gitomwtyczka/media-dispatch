@@ -67,7 +67,38 @@ task = {
 ### Wyjście: format odpowiedzi
 
 ```json
-{\n  "status": "ok",\n  "step1_generate": {\n    "status": "ok",\n    "status_code": 200,\n    "schema_data": { ... }\n  },\n  "step2_inject": {\n    "status": "ok",\n    "status_code": 200,\n    "wp_post_id": 12345,\n    "post_url": "https://prawy.pl/?p=12345"\n  },\n  "step3_yt_update": {\n    "status": "ok",\n    "title": "Tytuł filmu",\n    "privacyStatus": "unlisted"\n  },\n  "step4_shorts": {\n    "status": "ok",\n    "candidates": [ ... ],\n    "render_jobs": [\n      {\n        "job_id": "job_987",\n        "title": "Fragment...",\n        "start_sec": 15.0,\n        "end_sec": 50.0,\n        "status": "submitted"\n      }\n    ]\n  }\n}
+{
+  "status": "ok",
+  "step1_generate": {
+    "status": "ok",
+    "status_code": 200,
+    "schema_data": { ... }
+  },
+  "step2_inject": {
+    "status": "ok",
+    "status_code": 200,
+    "wp_post_id": 12345,
+    "post_url": "https://prawy.pl/?p=12345"
+  },
+  "step3_yt_update": {
+    "status": "ok",
+    "title": "Tytuł filmu",
+    "privacyStatus": "unlisted"
+  },
+  "step4_shorts": {
+    "status": "ok",
+    "candidates": [ ... ],
+    "render_jobs": [
+      {
+        "job_id": "job_987",
+        "title": "Fragment...",
+        "start_sec": 15.0,
+        "end_sec": 50.0,
+        "status": "submitted"
+      }
+    ]
+  }
+}
 ```
 
 ---
