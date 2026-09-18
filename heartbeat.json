@@ -1,13 +1,11 @@
 {
-  "callsign": "media-dev-38",
-  "status": "working",
-  "current_task": "Monitor Halwa pipeline + implementacja planów Opus (prawy-studio, transcribe, kurier365, radar, biznesciti, prawy-youtube)",
-  "timestamp": "2026-09-18T19:42:00Z",
+  "callsign": "media-dev",
+  "status": "done",
+  "current_task": "Halwa pipeline check + prawy-studio-worker worker.py fix",
+  "timestamp": "2026-09-18T20:20:00Z",
   "last_completed": [
-    "Halwa pipeline check on VPS — WP drafty #126536 i #126539 gotowe"
+    "Halwa pipeline — WP drafty #126536 (Leo) i #126539 (Wójcik 2) zakończone z sukcesem",
+    "fix: prawy-studio-worker worker.py — CLI multi-ID, JWT VPS, ścieżki env — commit e03959ec12589ba9e5913b384d1e9fa360a8d25c"
   ],
-  "pending": [
-    "Implementacja planów Opus dla workerów A-F",
-    "git pull w lokalnym repozytorium"
-  ]
+  "pending": []
 }
