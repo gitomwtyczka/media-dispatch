@@ -3,7 +3,7 @@
 Reguły specyficzne dla workspace `media-dispatch`.
 Uzupełnia `RULE[user_global]` — nie zastępuje.
 
-> Ostatnia aktualizacja: 2026-09-11 | media-dev-37
+> Ostatnia aktualizacja: 2026-09-18 | media-strateg
 
 ---
 
@@ -81,12 +81,35 @@ Duplikacja OK: priorytetowe pojawiają się na obu kanałach.
 ## Kanały YouTube obsługiwane
 
 | Kanał | Konto | Playlista |
-|-------|-------|-----------|
+|-------|-------|----------|
 | Prawy TV | tobroz@gmail.com | — |
 | Prawy Biblijny | tobroz@gmail.com | `PLw7UeigJuyWkUzzvhS1vZX0H251raaYa7` |
+| Studio Prawy_PL | tobroz@gmail.com | — |
 
 Oba kanały używają tego samego OAuth (to samo konto Google).
 Konfiguracja kanałów w **bazie danych VSE** — nie w plikach YAML.
+
+---
+
+## ⛔ KONTO OPERACYJNE — BEZWZGLĘDNA REGUŁA
+
+**Wszystkie operacje w systemach VSE, PressAI i powiązanych = konto `tobroz@gmail.com`**
+
+| System | Konto | ID |
+|--------|-------|----|
+| VSE | tobroz@gmail.com | USER_ID: `4b97ab0c-98ee-46c6-9be8-d86adc4cb38a` |
+| PressAI | tobroz@gmail.com | — |
+| YouTube OAuth (VSE) | tobroz@gmail.com | kanały YT mogą należeć do innych osób |
+| JWT sub | tobroz@gmail.com | `4b97ab0c-98ee-46c6-9be8-d86adc4cb38a` |
+
+**Zasady dla każdego agenta w tym workspace:**
+- Generowanie treści = **zawsze tobroz@gmail.com** — nie pytaj, nie szukaj, nie dodawaj fallbacków
+- Kanały YouTube mogą należeć do innych właścicieli — ale OAuth w VSE jest przez tobroz@gmail.com
+- Żaden agent NIE pyta "na jakim koncie?" — konto jest jedno i jest aktywne
+- Żaden agent NIE dodaje logiki "jeśli nie ma konta..." — konto jest
+- Generacje w VSE są zawsze przypisane do tego konta — nie weryfikuj, działaj
+
+> ℹ️ Weryfikacja: 18.09.2026 — user potwierdził reautoryzację kanału Studio Prawy_PL (`UCoH2G9By4OX3kcLsc8lHgDw`)
 
 ---
 
@@ -236,4 +259,5 @@ Worker MOŻE odładać tymczasową wiedzę w scratch swojego workspace
 *Rozbudowa: media-dev-06 | 31.08.2026 — reguła publikowania bezwzględna, Short Machine*  
 *Rozbudowa: media-dev-22 | 01.09.2026 — Discord Editorial Center w architekturze*  
 *Rozbudowa: media-dev-29 | 01.09.2026 — dual-channel Discord (#editorial-priority + #editorial-kurier365)*  
-*Rozbudowa: media-dev-37 | 11.09.2026 — transcribe-worker (Warstwa 3 Production)*
+*Rozbudowa: media-dev-37 | 11.09.2026 — transcribe-worker (Warstwa 3 Production)*  
+*Rozbudowa: media-strateg | 18.09.2026 — konto operacyjne tobroz@gmail.com jako bezwzględna reguła*
