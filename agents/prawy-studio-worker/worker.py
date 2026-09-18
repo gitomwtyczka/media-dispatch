@@ -6,7 +6,9 @@ media-dispatch | media-dev-06 | 31.08.2026
 Pipeline: generate_token -> check_captions -> generate SEO -> inject WP -> yt_update -> shorts
 
 CLI:
-  python worker.py --single YOUTUBE_ID [--date 2026-09-01] [--status draft|future|publish]
+  python worker.py YOUTUBE_ID [YOUTUBE_ID ...] [--date 2026-09-01] [--status draft|future|publish]
+  python worker.py --videos YOUTUBE_ID [YOUTUBE_ID ...]
+  python worker.py --single YOUTUBE_ID
   python worker.py --batch films.json
   python worker.py --list
   python worker.py --shorts-only YOUTUBE_ID
@@ -17,6 +19,7 @@ CLI:
 import argparse
 import json
 import logging
+import os
 import subprocess
 import sys
 import time
@@ -29,15 +32,17 @@ import requests
 # KONFIGURACJA — dostosuj do srodowiska
 # ---------------------------------------------------------------------------
 
-VSE_URL = "https://vse.impresjapr.pl"
+VSE_URL = os.environ.get("VSE_URL", "https://vse.impresjapr.pl")
 PORTAL_ID = "2b047d7d-15a1-4d2f-8463-f89c2275bb73"   # UUID prawy.pl
 YT_CHANNEL_ID = "UCoH2G9By4OX3kcLsc8lHgDw"            # Studio Prawy_PL
-SSH_HOST = "ubuntu@147.224.162.100"
-SSH_KEY = r"C:\Users\tomas2\.ssh\oracle-crimson.key"
+SSH_HOST = os.environ.get("SSH_HOST", "ubuntu@147.224.162.100")
+SSH_KEY = os.environ.get("SSH_KEY", r"C:\Users\tomas2\.ssh\oracle-crimson.key")
 DOCKER_CONTAINER = "vse-api"
-USER_ID = "4b97ab0c-98ee-46c6-9be8-d86adc4cb38a"       # tobroz@gmail.com
-LOCAL_VIDEO_DIR = r"C:\Users\tomas2\Videos\Prawy"
-OUTPUT_DIR = r"C:\VSE\Shorts"
+USER_ID = os.environ.get("VSE_USER_ID", "4b97ab0c-98ee-46c6-9be8-d86adc4cb38a")       # tobroz@gmail.com
+SHORTS_OUTPUT_DIR = os.environ.get("SHORTS_OUTPUT_DIR", "/home/ubuntu/VSE/Shorts")
+VIDEO_INPUT_DIR = os.environ.get("VIDEO_INPUT_DIR", "/home/ubuntu/media-dispatch/input")
+LOCAL_VIDEO_DIR = VIDEO_INPUT_DIR
+OUTPUT_DIR = SHORTS_OUTPUT_DIR
 STATE_FILE = Path(__file__).parent / "batch_progress.json"
 
 # ⛔ REGUŁA: domyślny status zawsze draft (WP) i unlisted (YT)
@@ -105,29 +110,48 @@ def generate_token() -> str:
     """Generuje JWT token przez docker exec w kontenerze vse-api.
 
     Uzywa jose.jwt.encode() z JWT_SECRET_KEY — jedyna niezawodna metoda.
+    Dziala bezposrednio na VPS przez docker exec, z fallbackiem SSH dla uruchomien lokalnych.
     Patrz VSE Constitution sekcja 2.
     """
     log.info("Generowanie JWT token przez docker exec...")
-    code = (
-        "import os, datetime; "
-        "from jose import jwt; "
-        "s = os.environ.get('JWT_SECRET_KEY', ''); "
-        f"p = {{'sub': '{USER_ID}', "
-        "'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)}}; "
-        "print(jwt.encode(p, s, algorithm='HS256'))"
-    )
     cmd = [
-        "ssh", "-i", SSH_KEY,
-        "-o", "StrictHostKeyChecking=no",
-        SSH_HOST,
-        f"docker exec {DOCKER_CONTAINER} python3 -c {json.dumps(code)}",
+        "docker", "exec", "vse-api", "python3", "-c",
+        "import os; from jose import jwt; import datetime; "
+        "exp = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24); "
+        "print(jwt.encode({'sub': os.environ.get('VSE_USER_ID', '4b97ab0c-98ee-46c6-9be8-d86adc4cb38a'), "
+        "'exp': exp, 'type': 'access'}, os.environ.get('JWT_SECRET_KEY'), algorithm='HS256'))"
     ]
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=T_SSH)
-    token = r.stdout.strip()
-    if not token or r.returncode != 0:
-        raise RuntimeError(f"generate_token FAIL: {r.stderr.strip()}")
-    log.info("Token wygenerowany OK (dlugosc: %d)", len(token))
-    return token
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        token = result.stdout.strip()
+        if token and result.returncode == 0:
+            log.info("Token wygenerowany OK (dlugosc: %d)", len(token))
+            return token
+    except Exception as e:
+        log.warning("Bezposredni docker exec nie powiodl sie: %s", e)
+
+    # Fallback dla uruchomienia poza VPS (np. Windows z kluczem SSH)
+    if Path(SSH_KEY).exists():
+        log.info("Proba generowania tokenu przez SSH...")
+        ssh_cmd = [
+            "ssh", "-i", SSH_KEY,
+            "-o", "StrictHostKeyChecking=no",
+            SSH_HOST,
+            "docker exec vse-api python3 -c '"
+            "import os; from jose import jwt; import datetime; "
+            "exp = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24); "
+            "print(jwt.encode({\"sub\": os.environ.get(\"VSE_USER_ID\", \"4b97ab0c-98ee-46c6-9be8-d86adc4cb38a\"), "
+            "\"exp\": exp, \"type\": \"access\"}, os.environ.get(\"JWT_SECRET_KEY\"), algorithm=\"HS256\"))'"
+        ]
+        r = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=T_SSH)
+        token = r.stdout.strip()
+        if token and r.returncode == 0:
+            log.info("Token wygenerowany OK przez SSH (dlugosc: %d)", len(token))
+            return token
+        raise RuntimeError(f"generate_token FAIL (SSH): {r.stderr.strip()}")
+
+    err = result.stderr.strip() if "result" in locals() and result else "nieznany blad"
+    raise RuntimeError(f"generate_token FAIL: {err}")
 
 
 def auth_headers(token: str) -> dict:
@@ -164,7 +188,7 @@ def check_captions_ready(youtube_id: str, headers: dict, wait: bool = True) -> b
     Zwraca True gdy gotowe, False gdy timeout.
     """
     url = f"https://www.youtube.com/watch?v={youtube_id}"
-    log.info("[captions] Sprawdzam gotowose napisow dla %s...", youtube_id)
+    log.info("[captions] Sprawdzam gotowosc napisow dla %s...", youtube_id)
 
     deadline = time.time() + CAPTIONS_MAX_WAIT
     attempt = 0
@@ -307,7 +331,7 @@ def run_yt_update(
             timeout=T_GENERATE,
         )
         if resp.status_code == 401:
-            raise RuntimeError("YT OAuth invalid_grant lub token wygasl — zglос do Supervisora!")
+            raise RuntimeError("YT OAuth invalid_grant lub token wygasl — zglos do Supervisora!")
         resp.raise_for_status()
         return resp.json()
 
@@ -371,7 +395,7 @@ def run_shorts_render(
             "candidate_data": c,
             "render_format": "9:16",
             "subtitles": "none",
-            "output_dir": OUTPUT_DIR,
+            "output_dir": SHORTS_OUTPUT_DIR,
             "portal_id": portal_id,
         }
         if local_path:
@@ -404,7 +428,7 @@ def find_local_file(film: dict) -> str | None:
     """Szuka lokalnego pliku wideo dla danego filmu."""
     if film.get("local_path") and Path(film["local_path"]).exists():
         return film["local_path"]
-    video_dir = Path(LOCAL_VIDEO_DIR)
+    video_dir = Path(VIDEO_INPUT_DIR)
     if not video_dir.exists():
         return None
     youtube_id = film["youtube_id"]
@@ -522,7 +546,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Przyklady:
-  python worker.py --single abc123 --date 2026-09-01 --status future
+  python worker.py abc123 def456 --date 2026-09-01 --status future
+  python worker.py --videos abc123 def456
+  python worker.py --single abc123
   python worker.py --batch films.json
   python worker.py --list
   python worker.py --shorts-only abc123
@@ -530,11 +556,13 @@ Przyklady:
   python worker.py --reset abc123
 """,
     )
-    parser.add_argument("--single", metavar="YOUTUBE_ID", help="Przetworz jeden film")
+    parser.add_argument("videos", nargs="*", default=None, help="YouTube IDs to process")
+    parser.add_argument("--videos", nargs="+", dest="videos_flag", help="YouTube IDs to process")
+    parser.add_argument("--single", metavar="YOUTUBE_ID", help="Przetworz jeden film (deprecated, uzyj videos)")
     parser.add_argument("--batch", metavar="FILMS_JSON", help="Przetworz filmy z pliku JSON")
     parser.add_argument("--list", action="store_true", help="Pokaz liste filmow i status")
     parser.add_argument("--shorts-only", metavar="YOUTUBE_ID", help="Generuj tylko shorty (bez regeneracji artykulu)")
-    parser.add_argument("--check-captions", metavar="YOUTUBE_ID", help="Sprawdz gotowose napisow YT")
+    parser.add_argument("--check-captions", metavar="YOUTUBE_ID", help="Sprawdz gotowosc napisow YT")
     parser.add_argument("--reset", metavar="YOUTUBE_ID", help="Reset checkpointu dla filmu")
     parser.add_argument("--date", metavar="YYYY-MM-DD", help="Data publikacji WP i YT (domyslnie: jutro)")
     parser.add_argument(
@@ -609,23 +637,6 @@ Przyklady:
         log.info("✅ Shorts-only OK: %d job_ids", len(job_ids))
         return
 
-    # --- SINGLE ---
-    if args.single:
-        youtube_id = args.single
-        log.info("Generowanie tokenu...")
-        token = generate_token()
-        headers = auth_headers(token)
-
-        # Weryfikacja napisow przed processingiem
-        log.info("Weryfikacja gotowosci napisow...")
-        captions_ok = check_captions_ready(youtube_id, headers, wait=True)
-        if not captions_ok:
-            log.warning("UWAGA: Napisy niedostepne — pipeline moze wygenerowac slabszy artykul")
-
-        film = {"youtube_id": youtube_id, "title": youtube_id}
-        process_film(film, state, headers, args.status, scheduled_date)
-        return
-
     # --- BATCH ---
     if args.batch:
         batch_file = Path(args.batch)
@@ -655,6 +666,39 @@ Przyklady:
                 time.sleep(20)
 
         log.info("\nBatch done: %d/%d OK", ok_count, len(films))
+        return
+
+    # --- VIDEOS (MULTIPLE OR SINGLE) ---
+    video_ids = []
+    if args.videos:
+        video_ids.extend(args.videos)
+    if args.videos_flag:
+        video_ids.extend(args.videos_flag)
+    if args.single:
+        video_ids.append(args.single)
+
+    if video_ids:
+        log.info("Generowanie tokenu...")
+        token = generate_token()
+        headers = auth_headers(token)
+
+        ok_count = 0
+        for i, youtube_id in enumerate(video_ids):
+            log.info("\n[%d/%d] Film: %s", i + 1, len(video_ids), youtube_id)
+            log.info("Weryfikacja gotowosci napisow...")
+            captions_ok = check_captions_ready(youtube_id, headers, wait=True)
+            if not captions_ok:
+                log.warning("UWAGA: Napisy niedostepne dla %s — pipeline moze wygenerowac slabszy artykul", youtube_id)
+
+            film = {"youtube_id": youtube_id, "title": youtube_id}
+            success = process_film(film, state, headers, args.status, scheduled_date)
+            if success:
+                ok_count += 1
+            if i < len(video_ids) - 1:
+                log.info("Przerwa 10s przed kolejnym filmem...")
+                time.sleep(10)
+
+        log.info("\nPrzetworzono: %d/%d OK", ok_count, len(video_ids))
         return
 
     parser.print_help()
