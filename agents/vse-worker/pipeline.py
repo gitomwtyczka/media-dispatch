@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-"""
-agents/vse-worker/pipeline.py — Autonomiczny 4-krokowy pipeline Video SEO Engine
+"""agents/vse-worker/pipeline.py — Autonomiczny 4-krokowy pipeline Video SEO Engine
 
 Obsługiwane kroki:
 1. POST /v1/generate — generowanie metadanych SEO, tytułów, rozdziałów i artykułu (Claude)
 2. POST /v1/inject — wstrzyknięcie artykułu do WordPress (ZAWSZE post_status='draft')
-3. Update YouTube metadata — aktualizacja tytułu, opisu z linkiem do WP, rozdziałów (ZAWSZE privacyStatus='unlisted')
-4. POST /v1/shorts/candidates & POST /v1/shorts/render — wyłonienie kandydatów i submit render jobs dla Shortów
+3. GET /v1/jobs/{generation_id} + POST /v1/youtube/publish-description — VSE obsługuje YT wewnętrznie
+4. POST /v1/shorts/candidates & POST /v1/shorts/render — wyłonienie kandydatów i render jobs
 
 Zasady nadrzędne:
 - WP post_status: ZAWSZE 'draft'
-- YT privacyStatus: ZAWSZE 'unlisted'
-- Bezpieczne zarządzanie tokenami (zmienne środowiskowe / SSH / docker exec)
+- YT: VSE obsługuje OAuth kanałów wewnętrznie — worker NIE robi OAuth YT
+- Konto operacyjne: tobroz@gmail.com (USER_ID: 4b97ab0c-98ee-46c6-9be8-d86adc4cb38a)
 """
 
 import os
@@ -29,13 +28,11 @@ logger = logging.getLogger("vse_worker.pipeline")
 
 
 def extract_youtube_id(url_or_id: str) -> str:
-    """Wyciąga 11-znakowy identyfikator wideo YouTube z URL lub zwraca sam identyfikator."""
     if not url_or_id:
         return ""
     url_or_id = url_or_id.strip()
     if len(url_or_id) == 11 and re.match(r"^[A-Za-z0-9_-]{11}$", url_or_id):
         return url_or_id
-
     patterns = [
         r"(?:v=|\/v\/|youtu\.be\/|\/embed\/|\/shorts\/)([A-Za-z0-9_-]{11})",
         r"^([A-Za-z0-9_-]{11})$"
@@ -48,7 +45,6 @@ def extract_youtube_id(url_or_id: str) -> str:
 
 
 class VSEPipeline:
-    """4-etapowy pipeline produkcyjny Video SEO Engine (VSE)."""
 
     def __init__(
         self,
@@ -71,12 +67,12 @@ class VSEPipeline:
         self.portal_id = (
             portal_id
             or os.environ.get("VSE_PORTAL_ID")
-            or "2b047d7d-15a1-4d2f-8463-f89c2275bb73"  # prawy.pl
+            or "2b047d7d-15a1-4d2f-8463-f89c2275bb73"
         )
         self.channel_id = (
             channel_id
             or os.environ.get("VSE_CHANNEL_ID")
-            or "UCoH2G9By4OX3kcLsc8lHgDw"  # Prawy
+            or "UCoH2G9By4OX3kcLsc8lHgDw"
         )
         self.output_dir = (
             output_dir
@@ -100,20 +96,12 @@ class VSEPipeline:
             or os.environ.get("VSE_LLM_PROVIDER")
             or "claude"
         )
-
         self.last_task: Optional[Dict[str, Any]] = None
         self.last_result: Optional[Dict[str, Any]] = None
 
     def _exec_container_script(self, python_code: str, timeout: int = 60) -> subprocess.CompletedProcess:
-        """
-        Uruchamia skrypt python wewnątrz kontenera vse-api.
-        Skrypt jest kodowany w base64, co eliminuje problemy ze znakami specjalnymi i cudzysłowami w powłokach.
-        Najpierw próbuje lokalnego dockera, a w razie braku przełącza na SSH do VPS.
-        """
         b64_code = base64.b64encode(python_code.encode("utf-8")).decode("ascii")
         inline_runner = f"import base64; exec(base64.b64decode('{b64_code}').decode('utf-8'))"
-
-        # 1. Próba lokalnego docker exec
         try:
             cmd = ["docker", "exec", "-w", "/app", "vse-api", "python3", "-c", inline_runner]
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
@@ -121,27 +109,20 @@ class VSEPipeline:
                 return res
         except (FileNotFoundError, PermissionError):
             pass
-
-        # 2. Fallback na SSH do VPS
         ssh_cmd = [
-            "ssh",
-            "-i", self.ssh_key,
-            "-o", "StrictHostKeyChecking=no",
+            "ssh", "-i", self.ssh_key, "-o", "StrictHostKeyChecking=no",
             self.vps_host,
             f'docker exec -w /app vse-api python3 -c "{inline_runner}"'
         ]
         return subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=timeout)
 
     def get_jwt_token(self, force_refresh: bool = False) -> str:
-        """Pobiera token JWT z instancji lub generuje dynamicznie w vse-api przez sekret."""
         if self.jwt_token and not force_refresh:
             return self.jwt_token
-
         env_token = os.environ.get("VSE_JWT_TOKEN")
         if env_token and not force_refresh:
             self.jwt_token = env_token.strip()
             return self.jwt_token
-
         token_gen_script = """
 import os, datetime
 from jose import jwt
@@ -155,60 +136,41 @@ print(jwt.encode(payload, secret, algorithm='HS256'))
         res = self._exec_container_script(token_gen_script, timeout=30)
         token = res.stdout.strip()
         if not token or res.returncode != 0:
-            err_msg = res.stderr.strip() or res.stdout.strip()
-            raise RuntimeError(f"JWT generation failed via docker/ssh: {err_msg}")
-
+            raise RuntimeError(f"JWT generation failed: {res.stderr.strip() or res.stdout.strip()}")
         self.jwt_token = token
         return self.jwt_token
 
     def _get_headers(self) -> Dict[str, str]:
-        token = self.get_jwt_token()
         return {
-            "Authorization": f"Bearer {token}",
+            "Authorization": f"Bearer {self.get_jwt_token()}",
             "Content-Type": "application/json"
         }
 
     def health_check(self) -> Dict[str, Any]:
-        """Sprawdza dostępność VSE API oraz stan autoryzacji."""
-        report: Dict[str, Any] = {
-            "status": "ok",
-            "vse_url": self.vse_url,
-            "api_reachable": False,
-            "jwt_status": "unknown",
-            "details": {}
-        }
-
-        # Test endpointu /health lub /v1/users/me
+        report: Dict[str, Any] = {"status": "ok", "vse_url": self.vse_url, "api_reachable": False, "jwt_status": "unknown", "details": {}}
         try:
-            r_health = requests.get(f"{self.vse_url}/health", timeout=10)
-            report["api_reachable"] = (r_health.status_code == 200)
-            report["details"]["health_status_code"] = r_health.status_code
+            r = requests.get(f"{self.vse_url}/health", timeout=10)
+            report["api_reachable"] = (r.status_code == 200)
+            report["details"]["health_status_code"] = r.status_code
         except Exception as e:
             report["api_reachable"] = False
             report["details"]["health_error"] = str(e)
-
-        # Test JWT autoryzacji
         try:
-            token = self.get_jwt_token()
-            headers = {"Authorization": f"Bearer {token}"}
+            headers = {"Authorization": f"Bearer {self.get_jwt_token()}"}
             r_auth = requests.get(f"{self.vse_url}/v1/users/me", headers=headers, timeout=10)
             if r_auth.status_code == 200:
                 report["jwt_status"] = "ok"
                 report["details"]["user"] = r_auth.json().get("email")
             else:
                 report["jwt_status"] = f"http_{r_auth.status_code}"
-                report["details"]["auth_response"] = r_auth.text[:200]
         except Exception as e:
             report["jwt_status"] = "error"
             report["details"]["jwt_error"] = str(e)
-
         if not report["api_reachable"] or report["jwt_status"] != "ok":
             report["status"] = "error"
-
         return report
 
     def get_status(self) -> Dict[str, Any]:
-        """Zwraca ostatni stan przetwarzania zadania."""
         return {
             "status": "idle" if not self.last_result else self.last_result.get("status", "unknown"),
             "vse_url": self.vse_url,
@@ -220,36 +182,30 @@ print(jwt.encode(payload, secret, algorithm='HS256'))
 
     def process(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Wykonuje 4-krokowy pipeline dla podanego zadania.
-
         task = {
             "video_url": "https://youtube.com/...",
-            "video_id": "...",                         # opcjonalnie jeśli podano video_url
-            "local_path": "/path/to/video.mp4",        # opcjonalnie dla render
-            "portal_id": "2b047d7d-...",               # opcjonalnie, default z env
-            "channel_id": "UCoH2G9By4OX3kcLsc8lHgDw",  # opcjonalnie
-            "provider": "claude",                      # opcjonalnie
-            "steps": [1, 2, 3, 4],                     # opcjonalnie — które kroki wykonać
-            "output_dir": "/home/ubuntu/VSE/Shorts"     # opcjonalnie
+            "video_id": "...",
+            "generation_id": "uuid",      # opcjonalnie — jeśli podany, step 1 pominięty
+            "wp_post_id": 12345,           # opcjonalnie — jeśli podany, step 2 pominięty
+            "local_path": "/path/mp4",
+            "portal_id": "uuid",
+            "channel_id": "...",
+            "provider": "claude",
+            "steps": [1, 2, 3, 4],
         }
         """
         video_url = task.get("video_url")
         video_id = task.get("video_id")
-
         if not video_id and video_url:
             video_id = extract_youtube_id(video_url)
         if not video_url and video_id:
             video_url = f"https://www.youtube.com/watch?v={video_id}"
-
         if not video_url or not video_id:
-            return {
-                "status": "error",
-                "error": "Brak wymaganego video_url lub video_id w zadaniu."
-            }
+            return {"status": "error", "error": "Brak video_url lub video_id."}
 
         portal_id = task.get("portal_id") or self.portal_id
         channel_id = task.get("channel_id") or self.channel_id
-        provider = task.get("provider") or task.get("llm_provider") or self.llm_provider
+        provider = task.get("provider") or self.llm_provider
         local_path = task.get("local_path")
         output_dir = task.get("output_dir") or self.output_dir
         steps = task.get("steps") or [1, 2, 3, 4]
@@ -266,14 +222,13 @@ print(jwt.encode(payload, secret, algorithm='HS256'))
         generation_id: str = task.get("generation_id", "")
         wp_post_url: str = task.get("wp_post_url", "")
         wp_post_id: Optional[int] = task.get("wp_post_id")
-
         headers = self._get_headers()
 
         # =========================================================================
         # KROK 1: POST /v1/generate
         # =========================================================================
         if 1 in steps:
-            logger.info(f"[1/4] POST /v1/generate dla {video_url} (provider={provider})...")
+            logger.info(f"[1/4] POST /v1/generate dla {video_url}...")
             gen_payload = {
                 "video_url": video_url,
                 "portal_id": portal_id,
@@ -284,14 +239,8 @@ print(jwt.encode(payload, secret, algorithm='HS256'))
             }
             if task.get("post_title"):
                 gen_payload["post_title"] = task["post_title"]
-
             try:
-                resp_gen = requests.post(
-                    f"{self.vse_url}/v1/generate",
-                    headers=headers,
-                    json=gen_payload,
-                    timeout=360
-                )
+                resp_gen = requests.post(f"{self.vse_url}/v1/generate", headers=headers, json=gen_payload, timeout=360)
                 if resp_gen.status_code == 200:
                     gen_json = resp_gen.json()
                     schema_data = gen_json.get("schema_data", {})
@@ -303,88 +252,80 @@ print(jwt.encode(payload, secret, algorithm='HS256'))
                     result["step1_generate"] = {
                         "status": "ok",
                         "status_code": resp_gen.status_code,
+                        "generation_id": generation_id,
                         "schema_data": schema_data
                     }
-                    result["step1_generate"]["generation_id"] = generation_id
                 else:
-                    result["step1_generate"] = {
-                        "status": "error",
-                        "status_code": resp_gen.status_code,
-                        "error": resp_gen.text[:500]
-                    }
+                    result["step1_generate"] = {"status": "error", "status_code": resp_gen.status_code, "error": resp_gen.text[:500]}
                     result["status"] = "error"
             except Exception as e:
-                result["step1_generate"] = {
-                    "status": "error",
-                    "error": str(e)
-                }
+                result["step1_generate"] = {"status": "error", "error": str(e)}
                 result["status"] = "error"
 
         # =========================================================================
         # KROK 2: POST /v1/inject (ZAWSZE post_status='draft')
         # =========================================================================
         if 2 in steps:
-            if result["status"] == "error" and 1 in steps and not schema_data:
-                result["step2_inject"] = {
-                    "status": "skipped",
-                    "error": "Krok 1 nie powiódł się lub brak schema_data."
-                }
+            if result["status"] == "error" and 1 in steps and not generation_id:
+                result["step2_inject"] = {"status": "skipped", "error": "Krok 1 nie powiódł się."}
             else:
-                logger.info(f"[2/4] POST /v1/inject do WordPress (post_status='draft')...")
+                logger.info("[2/4] POST /v1/inject do WordPress (draft)...")
                 inject_payload = {
                     "generation_id": generation_id,
-                    "post_status": "draft",  # REGUŁA BEZWZGLĘDNA: ZAWSZE draft
+                    "post_status": "draft",
                     "portal_id": portal_id
                 }
                 if not generation_id:
-                    # fallback: legacy
                     inject_payload["schema_data"] = schema_data
                     inject_payload["video_url"] = video_url
-
                 try:
-                    resp_inj = requests.post(
-                        f"{self.vse_url}/v1/inject",
-                        headers=headers,
-                        json=inject_payload,
-                        timeout=120
-                    )
+                    resp_inj = requests.post(f"{self.vse_url}/v1/inject", headers=headers, json=inject_payload, timeout=120)
                     if resp_inj.status_code == 200:
                         inj_json = resp_inj.json()
                         wp_post_id = inj_json.get("wp_post_id") or inj_json.get("post_id")
                         wp_post_url = inj_json.get("post_url") or inj_json.get("url") or ""
-                        result["step2_inject"] = {
-                            "status": "ok",
-                            "status_code": resp_inj.status_code,
-                            "wp_post_id": wp_post_id,
-                            "post_url": wp_post_url
-                        }
+                        result["step2_inject"] = {"status": "ok", "status_code": resp_inj.status_code, "wp_post_id": wp_post_id, "post_url": wp_post_url}
                     else:
-                        result["step2_inject"] = {
-                            "status": "error",
-                            "status_code": resp_inj.status_code,
-                            "error": resp_inj.text[:500]
-                        }
+                        result["step2_inject"] = {"status": "error", "status_code": resp_inj.status_code, "error": resp_inj.text[:500]}
                         result["status"] = "error"
                 except Exception as e:
-                    result["step2_inject"] = {
-                        "status": "error",
-                        "error": str(e)
-                    }
+                    result["step2_inject"] = {"status": "error", "error": str(e)}
                     result["status"] = "error"
 
         # =========================================================================
-        # KROK 3: POST /v1/youtube/publish-description (VSE obsługuje YT wewnętrznie)
+        # KROK 3: GET /v1/jobs/{generation_id} + POST /v1/youtube/publish-description
+        # VSE obsługuje YouTube OAuth wewnętrznie — worker NIE robi OAuth YT
         # =========================================================================
         if 3 in steps:
-            logger.info(f"[3/4] POST /v1/youtube/publish-description dla {video_id}...")
+            logger.info(f"[3/4] publish-description dla {video_id}...")
             if not generation_id:
                 result["step3_yt_update"] = {
                     "status": "skipped",
-                    "error": "Brak generation_id — wykonaj krok 1 najpierw"
+                    "error": "Brak generation_id — wykonaj krok 1 lub podaj generation_id w task"
                 }
             else:
+                # Jeśli brak schema_data (np. standalone step 3) — pobierz z GET /v1/jobs
+                if not schema_data:
+                    try:
+                        resp_job = requests.get(
+                            f"{self.vse_url}/v1/jobs/{generation_id}",
+                            headers=headers, timeout=30
+                        )
+                        if resp_job.status_code == 200:
+                            job_json = resp_job.json()
+                            schema_data = job_json.get("schema_data", {})
+                            if not video_id:
+                                video_id = job_json.get("video_id", "")
+                            logger.info(f"Pobrano schema_data z /v1/jobs/{generation_id}")
+                        else:
+                            logger.warning(f"GET /v1/jobs/{generation_id} zwrócił {resp_job.status_code}")
+                    except Exception as je:
+                        logger.warning(f"GET /v1/jobs failed: {je}")
+
                 pub_payload = {
                     "generation_id": generation_id,
+                    "video_id": video_id,
+                    "schema_data": schema_data,
                     "wp_post_id": wp_post_id,
                     "channel_ids": [channel_id],
                     "portal_id": portal_id
@@ -392,9 +333,7 @@ print(jwt.encode(payload, secret, algorithm='HS256'))
                 try:
                     resp_pub = requests.post(
                         f"{self.vse_url}/v1/youtube/publish-description",
-                        headers=headers,
-                        json=pub_payload,
-                        timeout=120
+                        headers=headers, json=pub_payload, timeout=120
                     )
                     if resp_pub.status_code == 200:
                         result["step3_yt_update"] = {
@@ -410,17 +349,14 @@ print(jwt.encode(payload, secret, algorithm='HS256'))
                         }
                         result["status"] = "error"
                 except Exception as e:
-                    result["step3_yt_update"] = {
-                        "status": "error",
-                        "error": str(e)
-                    }
+                    result["step3_yt_update"] = {"status": "error", "error": str(e)}
                     result["status"] = "error"
 
         # =========================================================================
         # KROK 4: POST /v1/shorts/candidates & POST /v1/shorts/render
         # =========================================================================
         if 4 in steps:
-            logger.info(f"[4/4] Propozycje Shortów i render jobs dla {video_id}...")
+            logger.info(f"[4/4] Shorts dla {video_id}...")
             cand_payload = {
                 "youtube_id": video_id,
                 "youtube_url": video_url,
@@ -429,90 +365,42 @@ print(jwt.encode(payload, secret, algorithm='HS256'))
                 "provider": provider,
                 "portal_id": portal_id
             }
-
             candidates_list: List[Dict[str, Any]] = []
             render_jobs: List[Dict[str, Any]] = []
-
             try:
-                resp_cand = requests.post(
-                    f"{self.vse_url}/v1/shorts/candidates",
-                    headers=headers,
-                    json=cand_payload,
-                    timeout=300
-                )
+                resp_cand = requests.post(f"{self.vse_url}/v1/shorts/candidates", headers=headers, json=cand_payload, timeout=300)
                 if resp_cand.status_code == 200:
-                    cand_json = resp_cand.json()
-                    candidates_list = cand_json.get("candidates", [])
+                    candidates_list = resp_cand.json().get("candidates", [])
                 else:
-                    result["step4_shorts"] = {
-                        "status": "error",
-                        "status_code": resp_cand.status_code,
-                        "error": resp_cand.text[:500],
-                        "candidates": [],
-                        "render_jobs": []
-                    }
+                    result["step4_shorts"] = {"status": "error", "status_code": resp_cand.status_code, "error": resp_cand.text[:500], "candidates": [], "render_jobs": []}
                     result["status"] = "error"
             except Exception as e:
-                result["step4_shorts"] = {
-                    "status": "error",
-                    "error": str(e),
-                    "candidates": [],
-                    "render_jobs": []
-                }
+                result["step4_shorts"] = {"status": "error", "error": str(e), "candidates": [], "render_jobs": []}
                 result["status"] = "error"
 
             if candidates_list:
                 if local_path:
-                    for idx, c in enumerate(candidates_list[:5]):
+                    for c in candidates_list[:5]:
                         render_payload = {
-                            "youtube_id": video_id,
-                            "youtube_url": video_url,
+                            "youtube_id": video_id, "youtube_url": video_url,
                             "local_path": local_path,
                             "start_sec": float(c.get("start_sec", 0)),
                             "end_sec": float(c.get("end_sec", 0)),
                             "candidate_data": c,
-                            "render_format": "9:16",
-                            "subtitles": "srt",
-                            "output_dir": output_dir,
-                            "portal_id": portal_id
+                            "render_format": "9:16", "subtitles": "srt",
+                            "output_dir": output_dir, "portal_id": portal_id
                         }
                         try:
-                            resp_render = requests.post(
-                                f"{self.vse_url}/v1/shorts/render",
-                                headers=headers,
-                                json=render_payload,
-                                timeout=60
-                            )
-                            if resp_render.status_code == 200:
-                                r_res = resp_render.json()
-                                job_id = r_res.get("job_id") or r_res.get("id")
-                                render_jobs.append({
-                                    "job_id": job_id,
-                                    "title": c.get("title"),
-                                    "start_sec": c.get("start_sec"),
-                                    "end_sec": c.get("end_sec"),
-                                    "local_path": local_path,
-                                    "status": "submitted"
-                                })
+                            resp_r = requests.post(f"{self.vse_url}/v1/shorts/render", headers=headers, json=render_payload, timeout=60)
+                            if resp_r.status_code == 200:
+                                r_res = resp_r.json()
+                                render_jobs.append({"job_id": r_res.get("job_id") or r_res.get("id"), "title": c.get("title"), "start_sec": c.get("start_sec"), "end_sec": c.get("end_sec"), "status": "submitted"})
                             else:
-                                render_jobs.append({
-                                    "title": c.get("title"),
-                                    "status": "error",
-                                    "status_code": resp_render.status_code,
-                                    "error": resp_render.text[:200]
-                                })
-                        except Exception as re:
-                            render_jobs.append({
-                                "title": c.get("title"),
-                                "status": "error",
-                                "error": str(re)
-                            })
+                                render_jobs.append({"title": c.get("title"), "status": "error", "status_code": resp_r.status_code, "error": resp_r.text[:200]})
+                        except Exception as re_err:
+                            render_jobs.append({"title": c.get("title"), "status": "error", "error": str(re_err)})
                 else:
-                    render_jobs.append({
-                        "status": "skipped",
-                        "message": "Brak parametru local_path — zadania renderowania pominięte."
-                    })
-
+                    render_jobs.append({"status": "skipped", "message": "Brak local_path — render pominięty."})
                 result["step4_shorts"] = {
                     "status": "ok" if any(j.get("status") in ("submitted", "skipped") for j in render_jobs) else "error",
                     "candidates": candidates_list,
