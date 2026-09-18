@@ -1,16 +1,13 @@
 {
-  "callsign": "media-strateg",
-  "status": "done",
-  "current_task": "Full flow Pluzanski — sesja zamknięta",
-  "timestamp": "2026-09-15T21:10:00Z",
+  "callsign": "media-dev-38",
+  "status": "working",
+  "current_task": "Monitor Halwa pipeline + implementacja planów Opus (prawy-studio, transcribe, kurier365, radar, biznesciti, prawy-youtube)",
+  "timestamp": "2026-09-18T19:42:00Z",
   "last_completed": [
-    "prawy_full_flow_pipeline.py — commit 56df556b (15.09.2026)",
-    "prawy_shorts_pipeline.py — commit 698c16cf (15.09.2026)",
-    "WP drafty: #126276 + #126281 na prawy.pl",
-    "YT opisy EWkRL1sEqQE + s6qif3Ed57E zaktualizowane",
-    "20 shortów wygenerowanych i wylądowanych w C:\\VSE\\Shorts\\"
+    "Halwa pipeline check on VPS — WP drafty #126536 i #126539 gotowe"
   ],
   "pending": [
-    "Phase 3: user uploaduje shorty na YT → agent podpina opisy"
+    "Implementacja planów Opus dla workerów A-F",
+    "git pull w lokalnym repozytorium"
   ]
 }
