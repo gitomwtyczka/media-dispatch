@@ -137,6 +137,7 @@ token = jwt.encode(payload, secret, algorithm='HS256')
 2. **YouTube status:** ZAWSZE `privacyStatus='unlisted'`. Zakaz samowolnego ustawiania na `public`.
 3. **Zakaz hardcodowania sekretów:** Tokeny JWT, poświadczenia OAuth, hasła bazodanowe nie mogą znajdować się w kodzie repozytorium.
 4. **Bezpieczny transport do kontenera:** Cały kod lub payload przesyłany do `docker exec` / SSH jest enkodowany w base64, co zapobiega psuciu znaków przez powłoki (PowerShell / Bash).
+5. **Konto VSE:** ZAWSZE `tobroz@gmail.com` (USER_ID: `4b97ab0c-98ee-46c6-9be8-d86adc4cb38a`). To konto ma OAuth dla wszystkich kanałów YT. Nie używać innych kont.
 
 ---
 
