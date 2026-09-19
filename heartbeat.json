@@ -1,11 +1,13 @@
 {
-  "callsign": "media-dev",
-  "status": "done",
-  "current_task": "Halwa pipeline check + prawy-studio-worker worker.py fix",
-  "timestamp": "2026-09-18T20:20:00Z",
+  "callsign": "media-dev-38",
+  "status": "working",
+  "current_task": "VSE pipeline rV92SWJocUI (kroki 1-4)",
+  "timestamp": "2026-09-19T14:28:30Z",
   "last_completed": [
     "Halwa pipeline — WP drafty #126536 (Leo) i #126539 (Wójcik 2) zakończone z sukcesem",
     "fix: prawy-studio-worker worker.py — CLI multi-ID, JWT VPS, ścieżki env — commit e03959ec12589ba9e5913b384d1e9fa360a8d25c"
   ],
-  "pending": []
+  "pending": [
+    "VSE pipeline rV92SWJocUI"
+  ]
 }
