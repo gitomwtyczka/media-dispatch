@@ -530,3 +530,30 @@ Jeśli VSE nie ma transkryptu → powróć za 30 min i ponownie wywołaj `/v1/ge
 - Email: `tobroz@gmail.com`
 - OAuth: podpięte kanały Studio Prawy_PL (`UCoH2G9By4OX3kcLsc8lHgDw`) i Prawy Biblijny (`UCNXh5eIlMVxnUBpTMKUp4CA`)
 - Zakaz używania innych kont do operacji VSE
+
+---
+
+## 16. Pliki lokalne — sciezki nagran biblijnych
+
+### Lokalizacja plikow wideo/audio
+| Element | Wartosc |
+|---------|--------|
+| Glowny katalog filmow biblijnych | `C:\Users\tomas2\Videos\Prawy\Biblia 30.08-04.09.2026\` |
+| Log Adobe Media Encoder (sciezki exportu) | `C:\Users\tomas2\Documents\Adobe\Adobe Media Encoder\26.0\AMEEncodingLog.txt` |
+| Kodowanie pliku AME log | UTF-16LE — czytaj przez `Get-Content -Encoding Unicode` |
+| Format nazw MP3 biblijnych | `Lk X, Y-Z DD.MM.YYYY dzien.mp3` |
+| Format nazw MP4 biblijnych | `lk-X,Y-Z-DD.MM.YYYY-dzien.mp4` lub `Lk X,Y-Z DD.MM.YYYY dzien.mp4` |
+
+### Jak znalezc sciezke lokalnego pliku po YT ID
+Czytaj log AME:
+```powershell
+Get-Content "C:\Users\tomas2\Documents\Adobe\Adobe Media Encoder\26.0\AMEEncodingLog.txt" -Encoding Unicode | Select-String -Pattern "youtube.com" -Context 5,0
+```
+Linia `Plik wyjsciowy` pojawia sie PRZED linia z URL YouTube w logu.
+
+### Procedura MP3 fallback (TYLKO gdy transcript_available=False)
+1. Sprawdz `transcript_available` w odpowiedzi `/v1/generate`
+2. Jesli False: szukaj MP4 w katalogu filmow biblijnych (patrz tabela wyzej)
+3. Konwertuj: `ffmpeg -i plik.mp4 -q:a 2 -map a plik.mp3 -y`
+4. Wyslij MP3 do `/v1/audio/generate` (lang=pl, llm_provider=claude, timeout=600s)
+5. Upload VTT na YT captions.insert -> czekaj 30s -> ponow `/v1/generate`
