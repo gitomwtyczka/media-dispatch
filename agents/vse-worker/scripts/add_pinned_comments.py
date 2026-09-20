@@ -10,7 +10,7 @@ Uruchomienie wewnatrz kontenera:
   docker exec -w /app vse-api python3 add_pinned_comments.py [YYYY-MM-DD]
 
   Bez argumentu: wszystkie shorty z results JSON
-  Z datą:       tylko shorty z publishAt na ten dzień
+  Z data:        tylko shorty z publishAt na ten dzien
 
 Autor: biblia-worker | media-dispatch 20.09.2026
 """
@@ -48,7 +48,6 @@ async def get_yt_channels():
     return channels
 
 def is_video_public(channels, video_id):
-    """Sprawdza czy video jest publiczne (privacyStatus=public)."""
     for ch in channels:
         try:
             youtube = build("youtube", "v3", credentials=ch["creds"])
@@ -63,11 +62,9 @@ def is_video_public(channels, video_id):
     return False
 
 def add_pinned_comment(channels, video_id, comment_text):
-    """Dodaje komentarz i przypina go."""
     for ch in channels:
         try:
             youtube = build("youtube", "v3", credentials=ch["creds"])
-            # Dodaj komentarz
             body = {
                 "snippet": {
                     "videoId": video_id,
@@ -89,8 +86,7 @@ async def main():
     print(f"=== add_pinned_comments.py | filtr={date_filter or 'wszystkie'} ===")
 
     if not os.path.exists(RESULTS_FILE):
-        print(f"[ERROR] Brak pliku wynikow: {RESULTS_FILE}")
-        print("Uruchom najpierw: docker exec -w /app vse-api python3 prawy_shorts_schedule.py")
+        print(f"[ERROR] Brak pliku: {RESULTS_FILE}")
         return
 
     with open(RESULTS_FILE, "r", encoding="utf-8") as f:
@@ -98,12 +94,10 @@ async def main():
 
     if date_filter:
         results = [r for r in results if r.get("publish_at", "").startswith(date_filter)]
-        print(f"[FILTER] Dzień {date_filter}: {len(results)} shortów")
-    else:
-        print(f"[INFO] Wszystkich shortów: {len(results)}")
+        print(f"[FILTER] Dzien {date_filter}: {len(results)} shortow")
 
     channels = await get_yt_channels()
-    print(f"[AUTH] Kanały: {[c['title'] for c in channels]}")
+    print(f"[AUTH] Kanaly: {[c['title'] for c in channels]}")
 
     summary = []
     for r in results:
@@ -111,26 +105,22 @@ async def main():
         comment = r.get("pinned_comment", "")
         slot    = r.get("slot", "")
         title   = (r.get("optimized_title") or "")[:40]
-
         print(f"\n--- {yt_id} | {slot} | {title} ---")
-
         if not comment:
-            print(f"  [SKIP] Brak pinned_comment w JSON")
+            print(f"  [SKIP] Brak pinned_comment")
             summary.append({"id": yt_id, "status": "skip_no_comment"})
             continue
-
         if not is_video_public(channels, yt_id):
-            print(f"  [SKIP] Video nie jest publiczne: {yt_id}")
+            print(f"  [SKIP] Nie publiczne: {yt_id}")
             summary.append({"id": yt_id, "status": "skip_not_public"})
             continue
-
         ok, cid = add_pinned_comment(channels, yt_id, comment)
         summary.append({"id": yt_id, "slot": slot, "status": "ok" if ok else "fail", "comment_id": cid})
 
     print("\n=== SUMMARY ===")
     for s in summary:
-        icon = "✅" if s["status"] == "ok" else ("⏭️" if "skip" in s["status"] else "❌")
-        print(f"  {icon} {s['id']} | {s.get('slot','')} | {s['status']}")
+        icon = "OK" if s["status"] == "ok" else "SKIP" if "skip" in s["status"] else "FAIL"
+        print(f"  [{icon}] {s['id']} | {s.get('slot','')} | {s['status']}")
 
 if __name__ == "__main__":
     asyncio.run(main())
