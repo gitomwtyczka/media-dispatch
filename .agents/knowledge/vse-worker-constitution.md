@@ -1,6 +1,6 @@
 # VSE Worker Constitution (media-dispatch)
 
-> Ostatnia aktualizacja: 2026-09-22 | media-dev-39 (aktualizacja flow shorts candidates/render, live YT description biblia pattern, kanały aktywne)
+> Ostatnia aktualizacja: 2026-09-22 | media-dev-38 (AME log sekcja, generate-srt flow, pułapki 22-26, video_url fix, kanały YT)
 
 Dokument opisuje zasady operacyjne dla workerów z rodziny `vse-worker`.
 Zawiera wiedzę zdobytą zarówno z poprzednich sesji jak i weryfikacji live 29-31.08.2026 oraz 15-22.09.2026.
@@ -18,7 +18,7 @@ Zawiera wiedzę zdobytą zarówno z poprzednich sesji jak i weryfikacji live 29-
 | Container Web | `vse-web` |
 | DB credentials | user=`vse`, db=`vse` |
 | VPS | `ubuntu@147.224.162.100` |
-| SSH key (pełna ścieżka Windows) | `C:\Users\tomas2\.ssh\oracle-crimson.key` |
+| SSH key (pełna ścieżka Windows) | `C:\\Users\\tomas2\\.ssh\\oracle-crimson.key` |
 | Dashboard | `https://vse.impresjapr.pl/dashboard` |
 
 ---
@@ -45,13 +45,13 @@ Lub przez subprocess z poziomu skryptu Python:
 ```python
 cmd = [
     "ssh", "-i", SSH_KEY, "-o", "StrictHostKeyChecking=no", VPS,
-    "docker exec vse-api python3 -c \""
+    "docker exec vse-api python3 -c \\\""
     "import os,datetime; from jose import jwt; "
     "s=os.environ.get('JWT_SECRET_KEY',''); "
     "p={'sub':'4b97ab0c-98ee-46c6-9be8-d86adc4cb38a',"
     "'exp':datetime.datetime.utcnow()+datetime.timedelta(hours=24)}; "
     "print(jwt.encode(p,s,algorithm='HS256'))"
-    "\""
+    "\\\""
 ]
 r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 token = r.stdout.strip()
@@ -77,9 +77,10 @@ curl -s -H "Authorization: Bearer TOKEN" http://localhost:8085/v1/users/me
 
 ```
 /v1/audio/generate          ← MP3 → Whisper → SEO (bez thumbnail!)
-/v1/generate                ← YouTube URL → SEO (z thumbnail, VideoObject schema)
+/v1/generate                ← YouTube URL → SEO (z thumbnail, VideoObject schema); pole: video_url NIE youtube_url!
 /v1/inject                  ← wstrzyknij schema do WP
 /v1/jobs/{job_id}/vtt       ← pobierz VTT z joba
+/v1/shorts/generate-srt/{yt_id}  ← generacja pakietu SRT (KROK 1 — PRZED candidates i render!)
 /v1/shorts/candidates       ← wyłonienie kandydatów na shorty (start_sec, end_sec, hook)
 /v1/shorts/render           ← kolejkowanie renderu shortów (9:16, napisy SRT)
 /v1/shorts/describe         ← Short Machine SEO (youtube_id + portal_id)
@@ -196,16 +197,24 @@ vtt_text = resp.json()["schema_data"].get("vtt") or resp.json()["schema_data"].g
 
 ## 6. YouTube OAuth
 
-- Konto: `tobroz@gmail.com` — obsługuje oba kanały (Prawy TV + Prawy Biblijny)
+- Konto: `tobroz@gmail.com` — obsługuje oba kanały (Studio Prawy_PL + Prawy TV)
 - OAuth tokens: w **bazie danych VSE** (NIE w plikach YAML)
 - Reautoryzacja: `https://vse.impresjapr.pl/v1/youtube/oauth/login` (wymaga sesji VSE)
 - Refresh token wygasa i wymaga **co kilka tygodni ręcznego odwołania** przez ten link
-- Po reautoryzacji sprawdzić: `GET /v1/youtube/channels` — powinno zwracać oba kanały
+- Po reautoryzacji sprawdzić: `GET /v1/youtube/channels` — powinno zwracać aktywne kanały
 
 ### ⚠️ Pułapka: `invalid_grant`
 Jeśli YouTube API zwraca `invalid_grant` → token wygasł.
 NIE próbuj naprawiać przez kod. Zgłoś bloker do Supervisora.
 User musi otworzyć: `https://vse.impresjapr.pl/v1/youtube/oauth/login` i zatwierdzić dostęp.
+
+### Kanały aktywne (tylko te dwa obsługujemy):
+- `Studio Prawy_PL` → channel_id: `UCoH2G9By4OX3kcLsc8lHgDw` ✅
+- `Prawy TV` → channel_id: `UCNXh5eIlMVxnUBpTMKUp4CA` ✅
+
+### Kanały out of scope (pomijaj w kodzie):
+- `VeriNarrMundo` → `invalid_grant` — token wygasł
+- `Tomasz Brzozowski` → konto osobiste, nie używać
 
 ### ⚠️ Pułapka: `/v1/youtube/channels` NIE zwraca access_token
 
@@ -289,7 +298,7 @@ Znane pułapki:
 | 2 | URL: `/v1/` nie `/api/v1/` | Publiczny: `https://vse.impresjapr.pl/v1/...` |
 | 3 | `create_access_token()` psuje się | Używaj `jose.jwt.encode()` z `JWT_SECRET_KEY` |
 | 4 | SQL przez SSH z PS | Skrypt bash → `write_to_file` → `scp` pełna ścieżka → `ssh bash /tmp/...` |
-| 5 | SCP `~` na Windows | Pełna ścieżka: `C:\Users\tomas2\...` |
+| 5 | SCP `~` na Windows | Pełna ścieżka: `C:\\Users\\tomas2\\...` |
 | 6 | Whisper timeout | timeout=600s, nie przerywaj |
 | 7 | Audio pipeline ≠ pełny pipeline | Patrz sekcja 4 — architektura flow |
 | 8 | `invalid_grant` YT OAuth | Nie naprawiaj kodem, zgłoś do Supervisora |
@@ -306,6 +315,11 @@ Znane pułapki:
 | 19 | **Brak `youtube_description_body` w DB** | Pole istnieje TYLKO w live response `/v1/generate`, NIE w `transcript_jobs` |
 | 20 | **`videos().update()` bez `title` = 400** | YouTube API v3 wymaga pełnego snippetu: `title` + `description` + `categoryId` |
 | 21 | **Zagnieżdżone f-stringi w runnerze** | Generuj skrypty kontenera jako `'\n'.join(lines)`, unikaj wielokrotnych klamer |
+| 22 | **`POST /v1/generate` pole `video_url`** | Kluczem w JSON jest `video_url`, a NIE `youtube_url`. Błędna nazwa daje HTTP 422. |
+| 23 | **Kolejność Shortów: `generate-srt` PRZED `render`** | Local Runner potrzebuje pakietu SRT przy montażu. Sekwencja: (1) `generate-srt` → (2) `candidates` → (3) `render`. |
+| 24 | **HTTP 429 na `generate-srt` = bug VSE (nie bloker)** | Backend VSE błędnie zgłasza limit free dla konta admin agency. Zaloguj ostrzeżenie i kontynuuj pipeline. |
+| 25 | **Zapis `local_overrides.json` wymaga `ensure_ascii=False`** | Użycie domyślnego `ensure_ascii=True` lub raw stringów `r"...\u0142..."` niszczy polskie litery i tworzy błędne foldery. |
+| 26 | **Naiwny matcher AME (`min(..., key=len)`) psuje wersjonowanie** | Wybiera np. `Rozbiory.mp4` zamiast `Rozbiory_2..mp4`. Czytaj AME log od końca (najnowsze eksporty). |
 
 ---
 
@@ -326,21 +340,25 @@ print(jwt.encode(payload, secret, algorithm='HS256'))
 
 ### Poprawny SCP (Windows → VPS)
 ```powershell
-scp -i C:\Users\tomas2\.ssh\oracle-crimson.key -o StrictHostKeyChecking=no `
-  "C:\Users\tomas2\.gemini\antigravity\playground\sonic-void\tmp\skrypt.sh" `
+scp -i C:\\Users\\tomas2\\.ssh\\oracle-crimson.key -o StrictHostKeyChecking=no `
+  "C:\\Users\\tomas2\\.gemini\\antigravity\\playground\\sonic-void\\tmp\\skrypt.sh" `
   ubuntu@147.224.162.100:/tmp/skrypt.sh
 ```
 
 ### Poprawne wywołanie /v1/generate
 ```python
 r = requests.post(f"{VSE_BASE}/v1/generate", headers=vsh(vse_token), json={
-    "video_url": f"https://www.youtube.com/watch?v={video_id}",
+    "video_url": f"https://www.youtube.com/watch?v={video_id}",  # video_url, NIE youtube_url!
     "publication_type": "full_analysis",   # NIE "film"
     "portal_id": "2b047d7d-15a1-4d2f-8463-f89c2275bb73",  # UUID, nie string
     "post_title": title,
     "lang": "pl",
     "llm_provider": "claude"               # NIE "gemini"
 }, timeout=360)
+# Przechwytuj z live response:
+resp_json = r.json()
+yt_title = resp_json.get("schema_data", {}).get("post_title") or resp_json.get("post_title") or title
+yt_desc = resp_json.get("schema_data", {}).get("youtube_description_body") or resp_json.get("youtube_description_body")
 ```
 
 ### Poprawne wywołanie Short Machine (/v1/shorts/describe)
@@ -365,17 +383,27 @@ data = r.json()
 | Typ publikacji WP | `full_analysis` (NIE `film`!) |
 | Lang | `pl` | LLM | `claude` (NIE `gemini`!) |
 | Publish time | 00:00 CEST (`+02:00`) danego dnia |
-| Pliki lokalne | `C:\Users\tomas2\Videos\Prawy\Biblia [data]\` (MP3 + MP4) |
-| Thumbnails lokalne | `D:\Biblioteki\prawy video\Biblia\Biblia [data]\` |
+| Pliki lokalne | `C:\\Users\\tomas2\\Videos\\Prawy\\Biblia [data]\\` (MP3 + MP4) |
+| Thumbnails lokalne | `D:\\Biblioteki\\prawy video\\Biblia\\Biblia [data]\\` |
 | Portal UUID | `2b047d7d-15a1-4d2f-8463-f89c2275bb73` |
 
 ---
 
-## 11. Short Machine — Full Generation Pipeline (Flow: candidates → render)
+## 11. Short Machine — Full Generation Pipeline (Flow: generate-srt → candidates → render → describe)
 
-> ⚠️ UWAGA: Stary endpoint `/v1/shorts/generate` jest przestarzały (zwraca HTTP 422). Obecna architektura opiera się na procesie: **candidates → render**, a po opublikowaniu na **describe**.
+> ⚠️ UWAGA: Pełny proces generowania shortów składa się z **4 kroków w ścisłej kolejności**. Naruszenie kolejności skutkuje shortami BEZ napisów!
 
-### Krok 1: Wyłonienie kandydatów na Shorty
+### Krok 1: Wygenerowanie pakietu SRT (PRZED wszystkim!)
+
+```
+POST /v1/shorts/generate-srt/{yt_id}?portal_id=2b047d7d-15a1-4d2f-8463-f89c2275bb73
+Headers: Authorization: Bearer {token}
+```
+
+> ⚠️ **Znany bug VSE (B2):** Endpoint może zwrócić HTTP 429 z komunikatem `"Limit free: 2 filmy/miesiąc"` mimo konta `agency`/`is_admin=true`. **NIE przerywaj pipeline'u** — zaloguj ostrzeżenie i przejdź do Kroku 2. Bug zgłoszony, oczekuje naprawy po stronie VSE backend.
+
+### Krok 2: Wyłonienie kandydatów na Shorty
+
 ```
 POST /v1/shorts/candidates
 ```
@@ -395,7 +423,8 @@ Zwraca listę segmentów `candidates[]`:
 - `title` / `hook` (propozycja tytułu i haczyka)
 - `score` / typ segmentu (emotional / professional)
 
-### Krok 2: Renderowanie wyselekcjonowanych segmentów
+### Krok 3: Renderowanie wyselekcjonowanych segmentów
+
 ```
 POST /v1/shorts/render
 ```
@@ -404,19 +433,19 @@ Payload per candidate:
 {
   "youtube_id": "{yt_id}",
   "youtube_url": "https://www.youtube.com/watch?v={yt_id}",
-  "local_path": "C:\\Users\\tomas2\\Videos\\Prawy\\{nazwa}.mp4",
+  "local_path": "{dokladna_sciezka_z_ame_logu}",
   "start_sec": 120.0,
   "end_sec": 165.0,
   "candidate_data": { "title": "..." },
   "render_format": "9:16",
   "subtitles": "srt",
-  "output_dir": "C:\\VSE\\Shorts",
+  "output_dir": "C:\\\\VSE\\\\Shorts",
   "portal_id": "2b047d7d-15a1-4d2f-8463-f89c2275bb73"
 }
 ```
 Zlecenie kolejkowane jest w systemie, zwracając `job_id` do monitorowania przez `GET /v1/shorts/{job_id}/result`.
 
-### Krok 3: Optymalizacja SEO po uploadzie na YouTube
+### Krok 4: Optymalizacja SEO po uploadzie na YouTube
 Po wyrenderowaniu i wgraniu shorta na kanał YouTube, do wygenerowania dedykowanego tytułu (<45 znaków), opisu i przypinanego komentarza używamy:
 ```
 POST /v1/shorts/describe
@@ -424,10 +453,11 @@ POST /v1/shorts/describe
 (Szczegółowy opis wejścia i wyjścia znajduje się w Sekcji 7).
 
 ### local_overrides.json & VSELocalRunner
-- Ścieżka: `C:\ProgramData\VSELocalRunner\local_overrides.json`
+- Ścieżka: `C:\\ProgramData\\VSELocalRunner\\local_overrides.json`
 - Mapuje YT ID → lokalny plik MP4 (Local Runner używa go do renderowania bezpośrednio z dysku bez re-downloadu z YouTube).
 - Windows Service: `VSELocalRunner` polluje `GET /v1/shorts/pending` co 5 sekund.
-- Katalog docelowy: `C:\VSE\Shorts\{nazwa_pliku}_{data}\{tytuł}_raw.mp4` + `_social.mp4`.
+- Katalog docelowy: `C:\\VSE\\Shorts\\{nazwa_pliku}_{data}\\{tytuł}_raw.mp4` + `_social.mp4`.
+- **⚠️ KRYTYCZNE:** Zapis ZAWSZE przez `json.dump(..., ensure_ascii=False, indent=2)` z kodowaniem UTF-8. Brak tej flagi → polskie litery → `\uXXXX` → błędne nazwy katalogów!
 
 ---
 
@@ -493,13 +523,14 @@ transcript_jobs, usage_logs, users, wp_portals, youtube_channels
 2. **YouTube API v3 `videos().update()` wymaga PEŁNEGO snippetu (`title` + `description` + `categoryId`)** — przekazanie samego opisu bez tytułu zwróci błąd HTTP 400 Bad Request!
 3. **`POST /v1/youtube/publish-description` jest BROKEN dla kanałów Prawy** — zwraca `"error: channel not found or access denied"`.
 4. **Zagnieżdżone f-stringi w dynamicznym kodzie kontenera powodują `NameError`** — skrypt do kontenera należy budować wyłącznie jako listę linii: `'\n'.join(script_lines)`.
+5. **Worker NIE generuje opisów na własną rękę** — ZAWSZE pobierz `youtube_description_body` i `post_title` z live response `/v1/generate`. Generowanie własnych opisów przez LLM prowadzi do niespójności z redakcją portalu.
 
 ### ✅ Prawidłowy wzorzec: Live Response + videos().list() przed update()
 
 #### 1. Pobranie metadanych z live response:
 ```python
 resp = requests.post(f"{VSE_BASE}/v1/generate", headers=vsh(token), json={
-    "video_url": f"https://www.youtube.com/watch?v={yt_id}",
+    "video_url": f"https://www.youtube.com/watch?v={yt_id}",  # video_url, NIE youtube_url!
     "publication_type": "full_analysis",
     "portal_id": "2b047d7d-15a1-4d2f-8463-f89c2275bb73",
     "post_title": title,
@@ -509,12 +540,12 @@ resp = requests.post(f"{VSE_BASE}/v1/generate", headers=vsh(token), json={
 resp_json = resp.json()
 schema = resp_json.get("schema_data") or {}
 
-# Tytuł (obowiązkowy w snippet!)
+# Tytuł (obowiązkowy w snippet!) — z pól post_title lub title z live response
 yt_title = schema.get("post_title") or schema.get("title") or resp_json.get("post_title") or title
 if len(yt_title) > 100:
     yt_title = yt_title[:97] + "..."
 
-# Opis z live response
+# Opis z live response — z pola youtube_description_body
 yt_desc = schema.get("youtube_description_body") or resp_json.get("youtube_description_body")
 
 # Fallback w przypadku braku wygenerowanego opisu:
@@ -608,27 +639,92 @@ Jeśli VSE nie ma transkryptu → powróć za 30 min i ponownie wywołaj `/v1/ge
 
 ---
 
-## 16. Pliki lokalne — sciezki nagran biblijnych
+## 16. AME Log — jedyne źródło prawdy dla ścieżek lokalnych (KRYTYCZNE)
 
-### Lokalizacja plikow wideo/audio
-| Element | Wartosc |
+> ⚠️ Bugs B1, B3, B8 wynikają z łamania reguł tej sekcji!
+
+### Lokalizacja i kodowanie
+| Element | Wartość |
 |---------|--------|
-| Glowny katalog filmow biblijnych | `C:\Users\tomas2\Videos\Prawy\Biblia 30.08-04.09.2026\` |
-| Log Adobe Media Encoder (sciezki exportu) | `C:\Users\tomas2\Documents\Adobe\Adobe Media Encoder\26.0\AMEEncodingLog.txt` |
-| Kodowanie pliku AME log | UTF-16LE — czytaj przez `Get-Content -Encoding Unicode` |
+| Log Adobe Media Encoder | `C:\\Users\\tomas2\\Documents\\Adobe\\Adobe Media Encoder\\26.0\\AMEEncodingLog.txt` |
+| Kodowanie pliku logu | **UTF-16LE** — czytaj przez `open(..., encoding='utf-16-le')` lub `Get-Content -Encoding Unicode` |
 | Format nazw MP3 biblijnych | `Lk X, Y-Z DD.MM.YYYY dzien.mp3` |
 | Format nazw MP4 biblijnych | `lk-X,Y-Z-DD.MM.YYYY-dzien.mp4` lub `Lk X,Y-Z DD.MM.YYYY dzien.mp4` |
+| Wzorzec w logu: linia ścieżki | `Plik wyjściowy:` + ścieżka MP4 zawierająca `Prawy` |
 
-### Jak znalezc sciezke lokalnego pliku po YT ID
-Czytaj log AME:
-```powershell
-Get-Content "C:\Users\tomas2\Documents\Adobe\Adobe Media Encoder\26.0\AMEEncodingLog.txt" -Encoding Unicode | Select-String -Pattern "youtube.com" -Context 5,0
+### Zasady wyszukiwania ścieżek w AME logu
+
+**✅ Poprawny wzorzec (moduł Python):**
+```python
+import re
+import os
+import json
+
+AME_LOG_PATH = r"C:\Users\tomas2\Documents\Adobe\Adobe Media Encoder\26.0\AMEEncodingLog.txt"
+LOCAL_OVERRIDES_PATH = r"C:\ProgramData\VSELocalRunner\local_overrides.json"
+
+def resolve_ame_local_paths(film_keywords_map):
+    """
+    Czyta AME log w kodowaniu UTF-16LE.
+    Dopasowuje unikalne pliki MP4 do filmów unikając pułapki najkrótszej nazwy (Rozbiory vs Rozbiory_2).
+    film_keywords_map: {yt_id: ["słowo1", "słowo2", ...], ...}
+    """
+    if not os.path.exists(AME_LOG_PATH):
+        raise FileNotFoundError(f"Brak pliku logu AME: {AME_LOG_PATH}")
+
+    with open(AME_LOG_PATH, "r", encoding="utf-16-le", errors="replace") as f:
+        content = f.read()
+
+    pattern = r"[A-Za-z]:\\[^\n\r\t\"]+?\.mp4"
+    all_paths = re.findall(pattern, content, re.IGNORECASE)
+
+    # Filtruj ścieżki do folderu Prawy/Videos i usuń duplikaty zachowując kolejność
+    prawy_paths = list(dict.fromkeys(p for p in all_paths if "Prawy" in p and "Videos" in p))
+
+    resolved = {}
+    for yt_id, keywords in film_keywords_map.items():
+        # Szukaj dopasowań zawierających wszystkie słowa kluczowe
+        matches = [p for p in prawy_paths if all(k.lower() in p.lower() for k in keywords)]
+        if not matches:
+            print(f"[AME-WARN] Brak dopasowania dla {yt_id} ({keywords})")
+            continue
+
+        # Wybieramy OSTATNI wyrenderowany plik (najnowszy z logu AME) zamiast min(..., key=len)
+        chosen = matches[-1]
+        if os.path.exists(chosen):
+            resolved[yt_id] = chosen
+            print(f"[AME-OK] {yt_id} -> {chosen}")
+        else:
+            print(f"[AME-ERR] Plik nie istnieje na dysku: {chosen}")
+
+    return resolved
+
+def update_local_overrides_safe(overrides_dict):
+    """Bezpieczny zapis mapowania z wymuszeniem UTF-8 i ensure_ascii=False."""
+    existing = {}
+    if os.path.exists(LOCAL_OVERRIDES_PATH):
+        try:
+            with open(LOCAL_OVERRIDES_PATH, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        except Exception:
+            existing = {}
+
+    existing.update(overrides_dict)
+    os.makedirs(os.path.dirname(LOCAL_OVERRIDES_PATH), exist_ok=True)
+    with open(LOCAL_OVERRIDES_PATH, "w", encoding="utf-8") as f:
+        json.dump(existing, f, ensure_ascii=False, indent=2)
+    print(f"[OVERRIDES] Zaktualizowano {len(overrides_dict)} wpisów w local_overrides.json")
 ```
-Linia `Plik wyjsciowy` pojawia sie PRZED linia z URL YouTube w logu.
+
+### ❌ ZAKAZY — czego NIE robić
+- **NIGDY** nie hardkoduj ścieżek z Unicode escapes w raw stringach Python (`r"...\u0142..."` = literalne `\u0142`, nie `ł`!)
+- **NIGDY** nie używaj `min(matches, key=len)` — wybierze starszą krótszą nazwę zamiast nowszej wersji
+- **NIGDY** nie listuj losowych katalogów w poszukiwaniu pliku — AME log jest jedynym autorytatywnym źródłem
+- **NIGDY** nie zapisuj `local_overrides.json` bez `ensure_ascii=False` — polskie litery zostaną zamienione na `\uXXXX`
 
 ### Procedura MP3 fallback (TYLKO gdy transcript_available=False)
 1. Sprawdz `transcript_available` w odpowiedzi `/v1/generate`
-2. Jesli False: szukaj MP4 w katalogu filmow biblijnych (patrz tabela wyzej)
+2. Jesli False: szukaj MP4 używając `resolve_ame_local_paths()` (patrz wyżej)
 3. Konwertuj: `ffmpeg -i plik.mp4 -q:a 2 -map a plik.mp3 -y`
 4. Wyslij MP3 do `/v1/audio/generate` (lang=pl, llm_provider=claude, timeout=600s)
 5. Upload VTT na YT captions.insert -> czekaj 30s -> ponow `/v1/generate`
@@ -666,4 +762,5 @@ for ch in channels:
 *[Supervisor 01 | sonic-void 30.08.2026 — architektura audio vs YT pipeline, OAuth rotation, retrofitting thumbnails]*  
 *[media-strateg | media-dispatch 30.08.2026 — pułapki 11-14: llm_provider=claude, publication_type=full_analysis, portal_id UUID, YT token przez SSH _build_credentials]*  
 *[media-dev-12 | media-dispatch 31.08.2026 — sekcja Short Machine API (/v1/shorts/describe) na produkcji, pułapki 15-18]*  
-*[media-dev-39 | media-dispatch 22.09.2026 — aktualizacja sekcji 3 (publish-description broken), sekcji 11 (flow candidates->render), sekcji 14 (live response biblia pattern, videos.list przed update), pułapki 19-21, sekcja 17 kanały aktywne]*
+*[media-dev-39 | media-dispatch 22.09.2026 — aktualizacja sekcji 3 (publish-description broken), sekcji 11 (flow candidates→render), sekcji 14 (live response biblia pattern, videos.list przed update), pułapki 19-21, sekcja 17 kanały aktywne]*  
+*[media-dev-38 | media-dispatch 22.09.2026 — sekcja 16 AME log (resolve_ame_local_paths, update_local_overrides_safe), sekcja 11 rozbudowana (4 kroki: generate-srt→candidates→render→describe), pułapki 22-26, poprawka video_url w sek. 3/9/14, kanały YT sek. 6 uzupełnione o out-of-scope]*
