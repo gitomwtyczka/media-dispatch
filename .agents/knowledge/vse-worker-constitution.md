@@ -1,9 +1,9 @@
 # VSE Worker Constitution (media-dispatch)
 
-> Ostatnia aktualizacja: 2026-08-31 | media-dev-12 (wdrożenie Short Machine API /v1/shorts/describe)
+> Ostatnia aktualizacja: 2026-09-22 | media-dev-39 (aktualizacja flow shorts candidates/render, live YT description biblia pattern, kanały aktywne)
 
 Dokument opisuje zasady operacyjne dla workerów z rodziny `vse-worker`.
-Zawiera wiedzę zdobytą zarówno z poprzednich sesji jak i weryfikacji live 29-31.08.2026.
+Zawiera wiedzę zdobytą zarówno z poprzednich sesji jak i weryfikacji live 29-31.08.2026 oraz 15-22.09.2026.
 
 ---
 
@@ -73,17 +73,19 @@ curl -s -H "Authorization: Bearer TOKEN" http://localhost:8085/v1/users/me
 
 ---
 
-## 3. API Routes — kluczowe (31.08.2026)
+## 3. API Routes — kluczowe (zaktualizowano 22.09.2026)
 
 ```
 /v1/audio/generate          ← MP3 → Whisper → SEO (bez thumbnail!)
 /v1/generate                ← YouTube URL → SEO (z thumbnail, VideoObject schema)
 /v1/inject                  ← wstrzyknij schema do WP
 /v1/jobs/{job_id}/vtt       ← pobierz VTT z joba
+/v1/shorts/candidates       ← wyłonienie kandydatów na shorty (start_sec, end_sec, hook)
+/v1/shorts/render           ← kolejkowanie renderu shortów (9:16, napisy SRT)
 /v1/shorts/describe         ← Short Machine SEO (youtube_id + portal_id)
 /v1/youtube/channels        ← lista kanałów konta OAuth (metadane, BEZ access_token!)
 /v1/youtube/oauth/login     ← link do reautoryzacji OAuth
-/v1/youtube/publish-description  ← update opisu na YT
+/v1/youtube/publish-description  ← ⚠️ BROKEN dla kanałów Prawy (zwraca "channel not found or access denied"; używaj metody yt_desc w kontenerze)
 /v1/youtube/channels/{channel_id}/playlists
 /v1/portals                 ← config portali WP (credentials)
 /health
@@ -241,7 +243,7 @@ tokens = json.loads([l for l in r.stdout.strip().split('\n') if l.startswith('['
 # tokens = [{'id': ..., 'channel_id': ..., 'title': ..., 'token': 'ya29...'}]
 ```
 
-Kanały z aktywnymi tokenami (zweryfikowane 30.08.2026):
+Kanały z aktywnymi tokenami (zweryfikowane 30.08.2026 i 22.09.2026):
 - `Studio Prawy_PL` → channel_id: `UCoH2G9By4OX3kcLsc8lHgDw`
 - `Prawy TV` → channel_id: `UCNXh5eIlMVxnUBpTMKUp4CA`
 
@@ -301,6 +303,9 @@ Znane pułapki:
 | 16 | **Brak URL w opisie Shorta** | Linki w Shortach są nieklikalne i ucinają zasięg. Używaj `related_video_id` |
 | 17 | **Długość `optimized_title` max 45 zn** | Tytuły >45 znaków ucinają się na smartfonach |
 | 18 | **Przypinanie komentarza Shorts** | Używaj Comments API (`commentThreads.insert` / `commentsInsert`) dla `pinned_comment` |
+| 19 | **Brak `youtube_description_body` w DB** | Pole istnieje TYLKO w live response `/v1/generate`, NIE w `transcript_jobs` |
+| 20 | **`videos().update()` bez `title` = 400** | YouTube API v3 wymaga pełnego snippetu: `title` + `description` + `categoryId` |
+| 21 | **Zagnieżdżone f-stringi w runnerze** | Generuj skrypty kontenera jako `'\n'.join(lines)`, unikaj wielokrotnych klamer |
 
 ---
 
@@ -335,7 +340,7 @@ r = requests.post(f"{VSE_BASE}/v1/generate", headers=vsh(vse_token), json={
     "post_title": title,
     "lang": "pl",
     "llm_provider": "claude"               # NIE "gemini"
-}, timeout=300)
+}, timeout=360)
 ```
 
 ### Poprawne wywołanie Short Machine (/v1/shorts/describe)
@@ -366,35 +371,65 @@ data = r.json()
 
 ---
 
-## 11. Short Machine — Full Generation Pipeline
+## 11. Short Machine — Full Generation Pipeline (Flow: candidates → render)
 
-### Endpoint generowania shortów
-```
-POST /v1/shorts/generate
-```
+> ⚠️ UWAGA: Stary endpoint `/v1/shorts/generate` jest przestarzały (zwraca HTTP 422). Obecna architektura opiera się na procesie: **candidates → render**, a po opublikowaniu na **describe**.
 
+### Krok 1: Wyłonienie kandydatów na Shorty
+```
+POST /v1/shorts/candidates
+```
 Payload:
 ```json
 {
-  "youtube_url": "https://www.youtube.com/watch?v={yt_id}",
   "youtube_id": "{yt_id}",
-  "portal_id": "2b047d7d-15a1-4d2f-8463-f89c2275bb73",
+  "youtube_url": "https://www.youtube.com/watch?v={yt_id}",
   "count_emotional": 5,
   "count_professional": 5,
-  "local_path": "C:\\Users\\tomas2\\Videos\\Prawy\\{nazwa}.mp4",
-  "render_config": {"format": "9:16", "output_dir": "C:\\VSE\\Shorts"}
+  "provider": "claude",
+  "portal_id": "2b047d7d-15a1-4d2f-8463-f89c2275bb73"
 }
 ```
+Zwraca listę segmentów `candidates[]`:
+- `start_sec`, `end_sec` (czas rozpoczęcia i zakończenia fragmentu)
+- `title` / `hook` (propozycja tytułu i haczyka)
+- `score` / typ segmentu (emotional / professional)
 
-### local_overrides.json
+### Krok 2: Renderowanie wyselekcjonowanych segmentów
+```
+POST /v1/shorts/render
+```
+Payload per candidate:
+```json
+{
+  "youtube_id": "{yt_id}",
+  "youtube_url": "https://www.youtube.com/watch?v={yt_id}",
+  "local_path": "C:\\Users\\tomas2\\Videos\\Prawy\\{nazwa}.mp4",
+  "start_sec": 120.0,
+  "end_sec": 165.0,
+  "candidate_data": { "title": "..." },
+  "render_format": "9:16",
+  "subtitles": "srt",
+  "output_dir": "C:\\VSE\\Shorts",
+  "portal_id": "2b047d7d-15a1-4d2f-8463-f89c2275bb73"
+}
+```
+Zlecenie kolejkowane jest w systemie, zwracając `job_id` do monitorowania przez `GET /v1/shorts/{job_id}/result`.
+
+### Krok 3: Optymalizacja SEO po uploadzie na YouTube
+Po wyrenderowaniu i wgraniu shorta na kanał YouTube, do wygenerowania dedykowanego tytułu (<45 znaków), opisu i przypinanego komentarza używamy:
+```
+POST /v1/shorts/describe
+```
+(Szczegółowy opis wejścia i wyjścia znajduje się w Sekcji 7).
+
+### local_overrides.json & VSELocalRunner
 - Ścieżka: `C:\ProgramData\VSELocalRunner\local_overrides.json`
-- Mapuje YT ID → lokalny plik MP4
-- Local Runner używa go do cięcia bez pobierania z YT
+- Mapuje YT ID → lokalny plik MP4 (Local Runner używa go do renderowania bezpośrednio z dysku bez re-downloadu z YouTube).
+- Windows Service: `VSELocalRunner` polluje `GET /v1/shorts/pending` co 5 sekund.
+- Katalog docelowy: `C:\VSE\Shorts\{nazwa_pliku}_{data}\{tytuł}_raw.mp4` + `_social.mp4`.
 
-### VSELocalRunner
-- Windows Service: `VSELocalRunner`
-- Polluje `GET /v1/shorts/pending` co 5 sekund
-- Output: `C:\VSE\Shorts\{nazwa_pliku}_{data}\{tytuł}_raw.mp4` + `_social.mp4`
+---
 
 ## 12. Wzorzec pracy z agentami (odkryty 15.09.2026)
 
@@ -439,58 +474,115 @@ transcript_jobs, usage_logs, users, wp_portals, youtube_channels
 - Kolumna do zapytań: `video_url` (nie `video_id`!)
 - Query wzorzec: `WHERE video_url LIKE '%{yt_id}%' ORDER BY created_at DESC LIMIT 1`
 - Pola w schema_data: `lead`, `chapters`, `tags`, `yt_title`, `seo_title`, `faq`, `quotes`, `wp_id`, `yt_url`, `image_data`
-- NIE ma: `youtube_description_body`, `youtube_description_hook` (te pola są tylko w API response)
+- ⚠️ **NIE ma: `youtube_description_body`, `youtube_description_hook`** (te pola są generowane dynamicznie i zwracane TYLKO w live response API `/v1/generate`)
 
 ### youtube_channels
-| UUID | Nazwa | YouTube Channel ID |
-|------|-------|------------------|
-| 1d1f5783-... | VeriNarrMundo | UCJGgMtUhG1ILuyOKcL6JA_g |
-| 9ec1c7b8-... | Tomasz Brzozowski | UCIBzmtDQ1SrE0r7jtWbiTNw |
-| cdf73155-... | Studio Prawy_PL | UCoH2G9By4OX3kcLsc8lHgDw |
-| 776a3a65-... | Prawy TV | UCNXh5eIlMVxnUBpTMKUp4CA |
+| UUID | Nazwa | YouTube Channel ID | Status |
+|------|-------|--------------------|--------|
+| 1d1f5783-... | VeriNarrMundo | UCJGgMtUhG1ILuyOKcL6JA_g | ⚠️ Out of scope (invalid_grant) |
+| 9ec1c7b8-... | Tomasz Brzozowski | UCIBzmtDQ1SrE0r7jtWbiTNw | ⚠️ Out of scope (konto osobiste) |
+| cdf73155-... | Studio Prawy_PL | UCoH2G9By4OX3kcLsc8lHgDw | ✅ AKTYWNY |
+| 776a3a65-... | Prawy TV | UCNXh5eIlMVxnUBpTMKUp4CA | ✅ AKTYWNY |
 
-### youtube_channels OAuth status (15.09.2026)
-- VeriNarrMundo: `invalid_grant` (wygasły token)
-- Tomasz Brzozowski: OK
-- Studio Prawy\_PL: OK
-- Prawy TV: OK
+---
 
-## 14. YT Description — poprawna metoda (odkryto 15.09.2026)
+## 14. YT Description — Wzorzec Biblia / Live Response (zaktualizowano 22.09.2026)
 
-### Problem z publish-description
-`POST /v1/youtube/publish-description` sprawdza czy video należy do podanego kanału.
-Filmy na kanałach Prawy zarządzanych przez konto Tomasz Brzozowski zwracają
-`"error: channel not found or access denied"` dla wszystkich UUID w VSE.
+### ⚠️ Krytyczne pułapki YouTube API i VSE DB
+1. **`youtube_description_body` NIE istnieje w bazie danych (`transcript_jobs`)** — to pole jest zwracane **WYŁĄCZNIE w live response wywołania `POST /v1/generate`**. Próba odczytu z DB zwróci `None`!
+2. **YouTube API v3 `videos().update()` wymaga PEŁNEGO snippetu (`title` + `description` + `categoryId`)** — przekazanie samego opisu bez tytułu zwróci błąd HTTP 400 Bad Request!
+3. **`POST /v1/youtube/publish-description` jest BROKEN dla kanałów Prawy** — zwraca `"error: channel not found or access denied"`.
+4. **Zagnieżdżone f-stringi w dynamicznym kodzie kontenera powodują `NameError`** — skrypt do kontenera należy budować wyłącznie jako listę linii: `'\n'.join(script_lines)`.
 
-### Właściwa metoda: yt_desc_fix.py w kontenerze
-```bash
-# Skopiuj skrypt do kontenera i uruchom
-docker cp /tmp/yt_desc_fix.py vse-api:/app/yt_desc_fix.py
-docker exec -w /app vse-api python3 yt_desc_fix.py
-```
+### ✅ Prawidłowy wzorzec: Live Response + videos().list() przed update()
 
-Skrypt `agents/vse-worker/scripts/yt_desc_fix.py`:
-- Ładuje token Tomasz Brzozowski z bazy przez `_build_credentials(ch).refresh(Request())`
-- Pobiera schema_data z `transcript_jobs WHERE video_url LIKE '%{yt_id}%'`
-- Buduje opis z pól: `lead` + `chapters` (lista dictów) + `tags` + link WP
-- Aktualizuje przez `youtube.videos().update()` (NIE przez publish-description)
-
-### Budowanie opisu YT z transcript_jobs.schema_data
+#### 1. Pobranie metadanych z live response:
 ```python
-# lead -> opis główny
-lead = schema.get("lead", "")
+resp = requests.post(f"{VSE_BASE}/v1/generate", headers=vsh(token), json={
+    "video_url": f"https://www.youtube.com/watch?v={yt_id}",
+    "publication_type": "full_analysis",
+    "portal_id": "2b047d7d-15a1-4d2f-8463-f89c2275bb73",
+    "post_title": title,
+    "lang": "pl",
+    "llm_provider": "claude"
+}, timeout=360)
+resp_json = resp.json()
+schema = resp_json.get("schema_data") or {}
 
-# chapters -> lista dictów {"time": "00:00", "title": "..."}
-raw_chapters = schema.get("chapters", [])
-chapter_lines = [f"{c.get('time','')} {c.get('title','')}".strip() for c in raw_chapters if isinstance(c, dict)]
-chapters_str = "\n".join(chapter_lines)
+# Tytuł (obowiązkowy w snippet!)
+yt_title = schema.get("post_title") or schema.get("title") or resp_json.get("post_title") or title
+if len(yt_title) > 100:
+    yt_title = yt_title[:97] + "..."
 
-# tags -> lista stringów
-tags = schema.get("tags", [])
-hashtags_str = " ".join(f"#{t}" if not t.startswith("#") else t for t in tags)
+# Opis z live response
+yt_desc = schema.get("youtube_description_body") or resp_json.get("youtube_description_body")
 
-desc = f"{lead}\n\n{chapters_str}\n\n{hashtags_str}\n\nCzytaj wiecej: {wp_url}"
+# Fallback w przypadku braku wygenerowanego opisu:
+if not yt_desc:
+    lead = schema.get("lead", "")
+    raw_chapters = schema.get("chapters", [])
+    # UWAGA: chapter['time'] rzutuj na str (może być intem!)
+    chapter_lines = [f"{str(c.get('time',''))} {str(c.get('title',''))}".strip() for c in raw_chapters if isinstance(c, dict)]
+    chapters_str = "\n".join(chapter_lines)
+    tags = schema.get("tags", [])
+    hashtags_str = " ".join((f"#{t}" if not str(t).startswith("#") else str(t)) for t in tags)
+    parts = [p for p in [lead, chapters_str, hashtags_str] if p]
+    if wp_post_id:
+        parts.append(f"Czytaj wiecej: https://prawy.pl/?p={wp_post_id}")
+    yt_desc = "\n\n".join(parts)
+elif wp_post_id and f"prawy.pl/?p={wp_post_id}" not in yt_desc:
+    yt_desc += f"\n\nCzytaj wiecej: https://prawy.pl/?p={wp_post_id}"
 ```
+
+#### 2. Wykonanie aktualizacji w kontenerze vse-api (skrypt jako lista linii):
+```python
+script_lines = [
+    "import asyncio, json",
+    "from api.db import AsyncSessionLocal",
+    "from api.models.youtube_channel import YouTubeChannel",
+    "from api.core.youtube_publish import _build_credentials",
+    "from google.auth.transport.requests import Request",
+    "from googleapiclient.discovery import build",
+    "from sqlalchemy.future import select",
+    "",
+    "VIDEO_ID = " + json.dumps(yt_id),
+    "YT_TITLE = " + json.dumps(yt_title),
+    "YT_DESC = " + json.dumps(yt_desc),
+    "PRAWY_CHANNELS = ['UCoH2G9By4OX3kcLsc8lHgDw', 'UCNXh5eIlMVxnUBpTMKUp4CA']",
+    "",
+    "async def main():",
+    "    async with AsyncSessionLocal() as db:",
+    "        res = await db.execute(select(YouTubeChannel).where(YouTubeChannel.is_active == True))",
+    "        channels = res.scalars().all()",
+    "        updated = False",
+    "        for ch in channels:",
+    "            if ch.youtube_channel_id not in PRAWY_CHANNELS:",
+    "                continue",
+    "            try:",
+    "                creds = _build_credentials(ch)",
+    "                creds.refresh(Request())",
+    "                yt = build('youtube', 'v3', credentials=creds, cache_discovery=False)",
+    "                # ZAWSZE pobierz aktualny snippet przed update!",
+    "                vresp = yt.videos().list(part='snippet', id=VIDEO_ID).execute()",
+    "                if not vresp.get('items'):",
+    "                    continue",
+    "                snippet = vresp['items'][0]['snippet']",
+    "                snippet['title'] = YT_TITLE",
+    "                snippet['description'] = YT_DESC",
+    "                yt.videos().update(part='snippet', body={'id': VIDEO_ID, 'snippet': snippet}).execute()",
+    "                print('OK: ' + VIDEO_ID + ' via ' + str(ch.title))",
+    "                updated = True",
+    "                break",
+    "            except Exception as e:",
+    "                print('SKIP ' + str(ch.title) + ': ' + str(e)[:100])",
+    "        if not updated:",
+    "            print('FAILED: ' + VIDEO_ID)",
+    "",
+    "asyncio.run(main())"
+]
+```
+
+---
 
 ## 15. Transcript Guard — zabezpieczenie przed hallucynacją (od prawy_full_flow_v2.py)
 
@@ -513,23 +605,6 @@ if resp.status_code == 200:
 
 YouTube generuje napisy automatycznie (do 30 min po uplodzie).
 Jeśli VSE nie ma transkryptu → powróć za 30 min i ponownie wywołaj `/v1/generate`.
-
----
-
-*[media-strateg-01 | media-dispatch 29.08.2026 — init]*  
-*[Supervisor 01 | sonic-void 29.08.2026 — pułapki live]*  
-*[Supervisor 01 | sonic-void 30.08.2026 — architektura audio vs YT pipeline, OAuth rotation, retrofitting thumbnails]*  
-*[media-strateg | media-dispatch 30.08.2026 — pułapki 11-14: llm_provider=claude, publication_type=full_analysis, portal_id UUID, YT token przez SSH _build_credentials]*  
-*[media-dev-12 | media-dispatch 31.08.2026 — sekcja Short Machine API (/v1/shorts/describe) na produkcji, pułapki 15-18]*
-
----
-
-## Konto VSE — zawsze tobroz@gmail.com
-
-- USER_ID: `4b97ab0c-98ee-46c6-9be8-d86adc4cb38a`
-- Email: `tobroz@gmail.com`
-- OAuth: podpięte kanały Studio Prawy_PL (`UCoH2G9By4OX3kcLsc8lHgDw`) i Prawy Biblijny (`UCNXh5eIlMVxnUBpTMKUp4CA`)
-- Zakaz używania innych kont do operacji VSE
 
 ---
 
@@ -557,3 +632,38 @@ Linia `Plik wyjsciowy` pojawia sie PRZED linia z URL YouTube w logu.
 3. Konwertuj: `ffmpeg -i plik.mp4 -q:a 2 -map a plik.mp3 -y`
 4. Wyslij MP3 do `/v1/audio/generate` (lang=pl, llm_provider=claude, timeout=600s)
 5. Upload VTT na YT captions.insert -> czekaj 30s -> ponow `/v1/generate`
+
+---
+
+## 17. Kanały YouTube — Aktywne vs Out of Scope
+
+Dla wszystkich operacji i pipeline'ów kanałów Prawy używamy **WYŁĄCZNIE** dwóch kanałów:
+
+| Kanał | YouTube Channel ID | Status | Zastosowanie |
+|-------|--------------------|--------|--------------|
+| **Studio Prawy_PL** | `UCoH2G9By4OX3kcLsc8lHgDw` | ✅ AKTYWNY | Główny kanał studyjny Prawy.pl |
+| **Prawy TV** | `UCNXh5eIlMVxnUBpTMKUp4CA` | ✅ AKTYWNY | Kanał telewizyjny Prawy TV / Biblijny |
+
+### Kanały pomijane (Out of Scope dla pipeline prawy):
+- **Tomasz Brzozowski** (`UCIBzmtDQ1SrE0r7jtWbiTNw`) — konto osobiste, NIE używać do publikacji treści Prawy.pl.
+- **VeriNarrMundo** (`UCJGgMtUhG1ILuyOKcL6JA_g`) — token wygasł (`invalid_grant`), pomijać w kodzie.
+
+### Wzorzec filtru kanałów w kodzie:
+```python
+PRAWY_CHANNELS = ['UCoH2G9By4OX3kcLsc8lHgDw', 'UCNXh5eIlMVxnUBpTMKUp4CA']
+
+for ch in channels:
+    if ch.youtube_channel_id not in PRAWY_CHANNELS:
+        print(f"SKIP out-of-scope channel: {ch.title} ({ch.youtube_channel_id})")
+        continue
+    # ... obsluga kanalu
+```
+
+---
+
+*[media-strateg-01 | media-dispatch 29.08.2026 — init]*  
+*[Supervisor 01 | sonic-void 29.08.2026 — pułapki live]*  
+*[Supervisor 01 | sonic-void 30.08.2026 — architektura audio vs YT pipeline, OAuth rotation, retrofitting thumbnails]*  
+*[media-strateg | media-dispatch 30.08.2026 — pułapki 11-14: llm_provider=claude, publication_type=full_analysis, portal_id UUID, YT token przez SSH _build_credentials]*  
+*[media-dev-12 | media-dispatch 31.08.2026 — sekcja Short Machine API (/v1/shorts/describe) na produkcji, pułapki 15-18]*  
+*[media-dev-39 | media-dispatch 22.09.2026 — aktualizacja sekcji 3 (publish-description broken), sekcji 11 (flow candidates->render), sekcji 14 (live response biblia pattern, videos.list przed update), pułapki 19-21, sekcja 17 kanały aktywne]*
