@@ -1,5 +1,26 @@
 # HANDOFF — media-strateg | 22.09.2026 18:43
 
+## ⚠️ PRIORYTET 0 — WERYFIKACJA BRAIN PRZED DZIAŁANIEM
+
+Przed wykonaniem jakichkolwiek kroków: przeanalizuj brain poprzedniej sesji.
+
+**Conversation ID:** `dc4d771a-34f6-4b0d-ad88-6a3ffd47e8cf`  
+**Transcript:** `C:\Users\tomas2\.gemini\antigravity\brain\dc4d771a-34f6-4b0d-ad88-6a3ffd47e8cf\.system_generated\logs\transcript.jsonl`
+
+**Co zweryfikować:**
+1. YT update Urbaniak (`BsmvkNqRGRU`) — czy naprawdę zakończyło się `OK: BsmvkNqRGRU via Studio Prawy_PL` (task-299 lub finalna komenda)?
+2. WP draft — worker `40b0fcdd` — jaki był jego output? Czy WP ID istnieje?
+3. Shorts Urbaniak — 10 jobów QUEUED — czy Local Runner potwierdził przetworzenie?
+4. Shorty 21.09 (59 jobów) — czy user potwierdził że są na dysku w `C:\VSE\Shorts\`?
+5. generate-srt 429 — które dokładnie filmy mają SRT a które nie?
+
+**Pliki wynikowe do sprawdzenia lokalnie:**
+- `C:\Users\tomas2\.gemini\antigravity\brain\urbaniak_generate_response.json`
+- `C:\Users\tomas2\.gemini\antigravity\brain\urbaniak_pipeline_results.json`
+- `C:\Users\tomas2\.gemini\antigravity\brain\shorts_candidates_results.json`
+
+**Strategia:** task logi w `.system_generated/tasks/task-*.log` zawierają rzeczywiste outputy komend — to jest źródło prawdy, nie deklaracje w handoffie.
+
 Powod: V1:Flash 80+ RED + dryf kompetencji (strateg implementowal zamiast delegowac do workera)
 
 ## CO ZROBIONE
