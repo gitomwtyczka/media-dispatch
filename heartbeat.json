@@ -1,15 +1,14 @@
 {
   "callsign": "media-dev-39",
-  "status": "working",
-  "current_task": "Zadania 1-3: prawy_yt_fix_21_09_2026.py, prawy_shorts_candidates_21_09_2026.py, aktualizacja vse-worker-constitution.md",
-  "timestamp": "2026-09-22T09:25:00Z",
+  "status": "done",
+  "current_task": "Zadania 1-3 zrealizowane: skrypty prawy_yt_fix_21_09_2026.py i prawy_shorts_candidates_21_09_2026.py oraz vse-worker-constitution.md wypchnięte do GitHub",
+  "timestamp": "2026-09-22T09:30:00Z",
   "last_completed": [
-    "VSE pipeline rV92SWJocUI: Krok 1 ok, Krok 2 WP draft #126588, Krok 3 YT desc ok, Krok 4 shorts (10 kandydatów)",
-    "Halwa pipeline — WP drafty #126536 (Leo) i #126539 (Wójcik 2) zakończone z sukcesem"
+    "prawy_yt_fix_21_09_2026.py — commit 8a76927b",
+    "prawy_shorts_candidates_21_09_2026.py — commit 20f4b9b9",
+    "vse-worker-constitution.md — commit bc01353a",
+    "current.md — commit 0adac629",
+    "raport dual-write (media-dispatch + sonic-void inbox) — commits 5bdeca28, 39fa0cf6"
   ],
-  "pending": [
-    "prawy_yt_fix_21_09_2026.py — fix YT title+desc dla 6 filmów",
-    "prawy_shorts_candidates_21_09_2026.py — shorts candidates pipeline & openapi diag",
-    "vse-worker-constitution.md — aktualizacja reguł operacyjnych"
-  ]
+  "pending": []
 }
