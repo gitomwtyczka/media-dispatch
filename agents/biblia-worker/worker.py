@@ -9,7 +9,7 @@ import config
 from pipeline import BibliaPipeline
 
 class BibliaWorker:
-    def __init__(self, dry_run=False):
+    def __init__(self, dry_run=True):
         self.dry_run = dry_run
         self.pipeline = BibliaPipeline(dry_run=dry_run)
 
@@ -82,21 +82,36 @@ class BibliaWorker:
                 
     def patch_meta(self, ids_list):
         for item in ids_list:
+            if ":" not in item:
+                continue
             wp_id, yt_id = item.split(':')
             self.pipeline.run_patch(yt_id, wp_id)
 
 def main():
     parser = argparse.ArgumentParser(description="Biblia Worker")
-    parser.add_argument("--dry-run", action="store_true", help="Dry run mode")
+    parser.add_argument("--execute", action="store_true", help="Run in production mode (default is DRY-RUN)")
     parser.add_argument("--batch", type=str, help="Path to batch JSON file")
     parser.add_argument("--patch-meta", action="store_true", help="Run patch logic")
     parser.add_argument("--ids", type=str, nargs="+", help="list of wp_id:yt_id")
+    parser.add_argument("--ids-file", type=str, help="Path to JSON file with {ids: [wp:yt]}")
     
     args = parser.parse_args()
-    worker = BibliaWorker(dry_run=args.dry_run)
     
-    if args.patch_meta and args.ids:
-        worker.patch_meta(args.ids)
+    dry_run = not args.execute
+    worker = BibliaWorker(dry_run=dry_run)
+    
+    if args.patch_meta:
+        ids = []
+        if args.ids:
+            ids.extend(args.ids)
+        if args.ids_file:
+            with open(args.ids_file, "r", encoding="utf-8") as f:
+                d = json.load(f)
+                ids.extend(d.get("ids", []))
+        if not ids:
+            print("No ids provided. Use --ids or --ids-file.")
+        else:
+            worker.patch_meta(ids)
     elif args.batch:
         worker.process_batch(args.batch)
     else:

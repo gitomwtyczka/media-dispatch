@@ -32,3 +32,6 @@ Zgodne ze stanem produkcyjnym na dzień 16.09.2026.
 
 ## Update
 Dane z VSE/WP/YT zawsze weryfikuj po zapisie (200 OK bez treści). Dodano weryfikację i fail-fast.
+
+## Wykonanie produkcyjne
+Worker i tryb patch_meta działają domyślnie w trybie `dry-run`. Aby uruchomić na produkcji, musisz jawnie podać flagę `--execute`.

@@ -46,3 +46,5 @@
 5. **Idempotencja**: Przed wstrzyknięciem do WP, worker zawsze odpytuje /v1/check (po video_id). Jeśli istnieje, pomija krok Inject.
 6. **Reguła publikowania (AGENTS.md)**: Domyślnie 'draft' (WP) i 'unlisted' (YT). Zmiana tylko na wyraźne żądanie (publish_now=true) lub data w przeszłości/przyszłości jawnie zadana.
 7. **Zakończenie pracy**: Worker zawsze generuje plik `results.json` i po jego analizie pisze Raport (do repo lokalnego i sonic-void).
+
+8. **Bezpieczeństwo**: Wszystkie operacje (batch i patch-meta) uruchamiają się jako `dry-run`. Do zapisu produkcyjnego wymagana jest flaga `--execute`.

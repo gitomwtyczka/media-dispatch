@@ -14,7 +14,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
 class BibliaPipeline:
-    def __init__(self, dry_run=False):
+    def __init__(self, dry_run=True):
         self.jwt_secret = None
         self.headers = None
         self.dry_run = dry_run
@@ -61,6 +61,7 @@ class BibliaPipeline:
         if self.dry_run:
             print("[DRY RUN] get_yt_tokens")
             self.channel_token = "mock_token"
+            self.yt_client = None
             return
 
         print("[*] YT tokens przez SSH + _build_credentials...")
@@ -399,23 +400,54 @@ asyncio.run(check())
                 raise Exception(f"STOP_BATCH: invalid_grant in YT update: {e}")
             raise e
             
-    def step_verify(self, wp_post_id, yt_id):
+    def step_verify(self, wp_post_id, yt_id, plan_status, plan_publish_at):
         if self.dry_run or not wp_post_id or str(wp_post_id) == "mock_wp_post_id":
             print(f"[DRY RUN] Step 6: Verifying {yt_id}...")
             return {"yt_verified": "mock", "wp_verified": "mock", "ok": True}
             
-        print(f"[*] Step 6: Verification...")
+        print(f"[*] Step 6: Verification for WP {wp_post_id} and YT {yt_id}...")
+        errors = []
         yt_stat_str = "unknown"
+        
+        # 1. YT verification
         try:
-            r_v = self.yt_client.videos().list(part="status", id=yt_id).execute()
+            r_v = self.yt_client.videos().list(part="snippet,status", id=yt_id).execute()
             if r_v.get("items"):
-                st = r_v["items"][0]["status"]
-                yt_stat_str = f"{st.get('privacyStatus')}"
-                if st.get('publishAt'):
-                    yt_stat_str += f"+{st.get('publishAt')}"
-        except Exception:
-            pass
+                v = r_v["items"][0]
+                st = v["status"]
+                sn = v["snippet"]
+                priv = st.get('privacyStatus')
+                pub_at = st.get('publishAt')
+                yt_stat_str = priv
+                if pub_at:
+                    yt_stat_str += f"+{pub_at}"
+                    
+                # Plan check
+                expected_priv = "private" if plan_status == "future" else ("public" if plan_status == "publish" else "unlisted")
+                if priv != expected_priv:
+                    errors.append(f"YT privacyStatus mismatch: {priv} != {expected_priv}")
+                if plan_publish_at and pub_at != plan_publish_at:
+                    errors.append(f"YT publishAt mismatch: {pub_at} != {plan_publish_at}")
+                
+                if not st.get('embeddable'):
+                    errors.append("YT not embeddable")
+                if sn.get('defaultLanguage') != 'pl':
+                    errors.append(f"YT defaultLanguage {sn.get('defaultLanguage')} != pl")
+                if sn.get('defaultAudioLanguage') != 'pl':
+                    errors.append(f"YT defaultAudioLanguage {sn.get('defaultAudioLanguage')} != pl")
+                    
+            else:
+                errors.append("YT video not found")
+                
+            # Playlist check
+            if getattr(config, 'PLAYLIST', None):
+                items = self.yt_client.playlistItems().list(part="snippet", playlistId=config.PLAYLIST, maxResults=50).execute()
+                if not any(item["snippet"]["resourceId"]["videoId"] == yt_id for item in items.get("items", [])):
+                    errors.append("YT not in PLAYLIST")
+        except Exception as e:
+            errors.append(f"YT check failed: {e}")
 
+        # 2. WP verification
         wp_stat_str = "unknown"
         code = f"""
 import asyncio, requests, json, uuid
@@ -427,12 +459,26 @@ async def get_p():
     async with AsyncSessionLocal() as db:
         portal = await db.get(WpPortal, uuid.UUID('{config.PORTAL_ID}'))
         auth = _make_auth(portal.wp_username, portal.wp_app_password)
-        resp = requests.get(f"{{portal.url.rstrip('/')}}/wp-json/wp/v2/posts/{wp_post_id}", auth=auth, timeout=15)
+        base_url = portal.url.rstrip('/')
+        
+        # Check exactly one by WP ID
+        resp = requests.get(f"{{base_url}}/wp-json/wp/v2/posts/{wp_post_id}", auth=auth, timeout=15)
         if resp.status_code == 200:
             p = resp.json()
-            print(json.dumps({{'status': p.get('status'), 'date': p.get('date')}}))
+            out = {{'status': p.get('status'), 'date': p.get('date'), 'date_gmt': p.get('date_gmt'), 'meta': p.get('meta', {{}})}}
+            
+            # Check terms
+            term_resp = requests.get(f"{{base_url}}/wp-json/wp/v2/podcast_show?post={wp_post_id}", auth=auth, timeout=15)
+            if term_resp.status_code == 200:
+                out['podcast_show'] = [t['slug'] for t in term_resp.json()]
+                
+            cat_resp = requests.get(f"{{base_url}}/wp-json/wp/v2/categories?post={wp_post_id}", auth=auth, timeout=15)
+            if cat_resp.status_code == 200:
+                out['categories'] = [t['slug'] for t in cat_resp.json()]
+                
+            print(json.dumps(out))
         else:
-            print(json.dumps({{'status': 'err_' + str(resp.status_code)}}))
+            print(json.dumps({{'error': 'err_' + str(resp.status_code)}}))
 asyncio.run(get_p())
 """
         cmd = ["ssh", "-i", config.SSH_KEY, "-o", "StrictHostKeyChecking=no", config.VPS,
@@ -440,18 +486,35 @@ asyncio.run(get_p())
         r_w = subprocess.run(cmd, capture_output=True, timeout=30)
         s_out = r_w.stdout.decode('utf-8', errors='replace').strip()
         for l in s_out.splitlines():
-            if '{"status"' in l:
+            if '{"status"' in l or '{"error"' in l:
                 try:
                     d = json.loads(l)
+                    if d.get("error"):
+                        errors.append(f"WP fetch error: {d['error']}")
+                        break
+                        
                     wp_stat_str = f"{d.get('status')}"
                     if d.get('date'):
                         wp_stat_str += f" ({d.get('date')})"
+                        
+                    if d.get("status") != plan_status:
+                        errors.append(f"WP status mismatch: {d.get('status')} != {plan_status}")
+                    
+                    if d.get("meta", {}).get("podcast_youtube_url") != f"https://www.youtube.com/watch?v={yt_id}":
+                        errors.append("WP meta podcast_youtube_url mismatch")
+                        
+                    if "prawy-biblijny" not in d.get("podcast_show", []):
+                        errors.append("WP missing podcast_show: prawy-biblijny")
+                        
+                    if "biblia" not in d.get("categories", []):
+                        errors.append("WP missing category: biblia")
+                        
                     break
                 except:
                     pass
         
-        ok = ("unknown" not in yt_stat_str and "unknown" not in wp_stat_str and "err_" not in wp_stat_str)
-        return {"yt_verified": yt_stat_str, "wp_verified": wp_stat_str, "ok": ok}
+        ok = len(errors) == 0
+        return {"yt_verified": yt_stat_str, "wp_verified": wp_stat_str, "ok": ok, "errors": errors}
 
     def run(self, yt_id, title, publish_date_local, publish_date_gmt, publish_date_iso, status='draft', mp4_path=None):
         try:
@@ -464,7 +527,8 @@ asyncio.run(get_p())
             wp_post_id = self.step_inject(yt_id, title, schema_data, publish_date_iso, status)
             self.step_wpcli(wp_post_id, yt_id, publish_date_local, publish_date_gmt, status)
             self.step_youtube(yt_id, schema_data, publish_date_iso, status)
-            v_res = self.step_verify(wp_post_id, yt_id)
+            
+            v_res = self.step_verify(wp_post_id, yt_id, status, publish_date_iso)
             print(f"[+] Successfully processed {yt_id}. Verification: YT={v_res.get('yt_verified')} WP={v_res.get('wp_verified')}")
             return v_res
         except Exception as e:
@@ -473,7 +537,7 @@ asyncio.run(get_p())
             
     def run_patch(self, yt_id, wp_post_id):
         if self.dry_run:
-            print(f"[DRY RUN] Patching YT {yt_id} and WP {wp_post_id}")
+            print(f"[DRY RUN] WOULD DO: Patch YT {yt_id} and WP {wp_post_id}")
             return True
             
         print(f"[*] Patching YT {yt_id} and WP {wp_post_id}")
