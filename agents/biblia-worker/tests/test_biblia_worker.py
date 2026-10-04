@@ -33,7 +33,7 @@ def test_transcript_guard_real_fallback(mock_post, mock_run):
     worker.pipeline.yt_client = MagicMock()
     worker.pipeline.yt_client.captions().insert().execute.return_value = {}
     
-    with patch('pipeline.Path.exists', side_effect=[True, False, True]), patch('pipeline.open'), patch('pipeline.time.sleep'):
+    with patch('pipeline.Path.exists', return_value=True), patch('pipeline.open'), patch('pipeline.time.sleep'):
         res = worker.pipeline.step_generate("test_id", "Title", mp4_path="dummy.mp4")
         assert "Poprawny transkrypt" in res.get("transkrypcja")
         assert mock_run.call_count >= 1
