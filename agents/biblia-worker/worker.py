@@ -13,35 +13,6 @@ class BibliaWorker:
         self.dry_run = dry_run
         self.pipeline = BibliaPipeline(dry_run=dry_run)
 
-    def health_check(self):
-        if self.dry_run:
-            print("[DRY RUN] Health check mock.")
-            return True
-        try:
-            print("[*] Checking VSE Health...")
-            resp = requests.get(f"{config.VSE_BASE}/health")
-            if not resp.ok:
-                print("[-] VSE API Health Check failed.")
-                return False
-            
-            print("[*] Checking JWT generation...")
-            self.pipeline.get_jwt_token()
-            print("[+] Health check passed!")
-            return True
-        except Exception as e:
-            print(f"[-] Health check exception: {e}")
-            return False
-
-    def process_single(self, yt_id, publish_date, status, mp4_path=None):
-        warsaw_tz = ZoneInfo("Europe/Warsaw")
-        local_dt = datetime.strptime(publish_date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=warsaw_tz)
-        utc_dt = local_dt.astimezone(ZoneInfo("UTC"))
-        
-        publish_date_gmt = utc_dt.strftime("%Y-%m-%d %H:%M:%S")
-        publish_date_iso = local_dt.isoformat()
-        
-        self.pipeline.run(yt_id, publish_date, publish_date_gmt, publish_date_iso, status, mp4_path)
-
     def process_batch(self, batch_file):
         with open(batch_file, "r", encoding="utf-8") as f:
             tasks = json.load(f)
@@ -56,7 +27,8 @@ class BibliaWorker:
                     break
                     
                 yt_id = t['yt_id']
-                print(f"\n[*] Processing batch item: {yt_id}")
+                title = t.get('title', yt_id)
+                print(f"\n[*] Processing batch item: {yt_id} ({title})")
                 
                 try:
                     publish_now = t.get('publish_now', False)
@@ -83,15 +55,21 @@ class BibliaWorker:
                         publish_date_gmt = ""
                         publish_date_iso = ""
                     
-                    self.pipeline.run(
+                    v_res = self.pipeline.run(
                         yt_id, 
+                        title,
                         publish_date_local, 
                         publish_date_gmt, 
                         publish_date_iso, 
                         status,
                         t.get('mp4_path')
                     )
-                    results.append({"yt_id": yt_id, "status": "SUCCESS"})
+                    ok = v_res.get("ok", True)
+                    results.append({
+                        "yt_id": yt_id, 
+                        "status": "SUCCESS" if ok else "FAILED", 
+                        "verification": v_res
+                    })
                 except Exception as e:
                     err_msg = str(e)
                     print(f"[-] Error on {yt_id}: {err_msg}")
@@ -101,25 +79,26 @@ class BibliaWorker:
         finally:
             with open("results.json", "w", encoding="utf-8") as rf:
                 json.dump(results, rf, indent=2)
+                
+    def patch_meta(self, ids_list):
+        for item in ids_list:
+            wp_id, yt_id = item.split(':')
+            self.pipeline.run_patch(yt_id, wp_id)
 
 def main():
     parser = argparse.ArgumentParser(description="Biblia Worker")
-    parser.add_argument("--health", action="store_true", help="Check health")
     parser.add_argument("--dry-run", action="store_true", help="Dry run mode")
-    parser.add_argument("--video-id", type=str, help="YouTube Video ID")
-    parser.add_argument("--publish-date", type=str, help="Publish date YYYY-MM-DD HH:MM:SS")
-    parser.add_argument("--status", type=str, default="draft", help="WP Status")
     parser.add_argument("--batch", type=str, help="Path to batch JSON file")
+    parser.add_argument("--patch-meta", action="store_true", help="Run patch logic")
+    parser.add_argument("--ids", type=str, nargs="+", help="list of wp_id:yt_id")
     
     args = parser.parse_args()
     worker = BibliaWorker(dry_run=args.dry_run)
     
-    if args.health:
-        worker.health_check()
+    if args.patch_meta and args.ids:
+        worker.patch_meta(args.ids)
     elif args.batch:
         worker.process_batch(args.batch)
-    elif args.video_id and args.publish_date:
-        worker.process_single(args.video_id, args.publish_date, args.status)
     else:
         parser.print_help()
 
