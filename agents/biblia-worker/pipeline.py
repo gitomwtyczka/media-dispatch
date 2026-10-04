@@ -538,6 +538,13 @@ asyncio.run(get_p())
     def run_patch(self, yt_id, wp_post_id):
         if self.dry_run:
             print(f"[DRY RUN] WOULD DO: Patch YT {yt_id} and WP {wp_post_id}")
+            print(f"  - WP-CLI: docker exec {config.WP_CONTAINER} wp post term add {wp_post_id} podcast_show prawy-biblijny --allow-root")
+            print(f"  - WP-CLI: docker exec {config.WP_CONTAINER} wp post meta update {wp_post_id} podcast_youtube_url 'https://www.youtube.com/watch?v={yt_id}' --allow-root")
+            print(f"  - WP-CLI: docker exec {config.WP_CONTAINER} wp term create category Biblia --slug=biblia --allow-root || true")
+            print(f"  - WP-CLI: docker exec {config.WP_CONTAINER} wp post term add {wp_post_id} category biblia --allow-root")
+            if str(wp_post_id) == '127477':
+                print(f"  - WP-CLI: docker exec {config.WP_CONTAINER} wp post term remove {wp_post_id} category uncategorized --allow-root || true")
+            print(f"  - YT API: videos.update(part='snippet,status') -> embeddable=True, defaultLanguage='pl', defaultAudioLanguage='pl'")
             return True
             
         print(f"[*] Patching YT {yt_id} and WP {wp_post_id}")

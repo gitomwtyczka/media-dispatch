@@ -1,11 +1,7 @@
 [
   {
-    "yt_id": "ABCDEFG1234",
+    "yt_id": "test",
     "status": "SUCCESS",
-    "verification": {
-      "yt_verified": "mock",
-      "wp_verified": "mock",
-      "ok": true
-    }
+    "verification": {}
   }
 ]
