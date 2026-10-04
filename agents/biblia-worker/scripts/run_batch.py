@@ -1,22 +1,20 @@
-import argparse
-import sys
 import os
+import sys
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from biblia_worker.worker import BibliaWorker
+# Dodajemy katalog agents/biblia-worker do sys.path aby importy dzialaly
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
-def main():
-    parser = argparse.ArgumentParser(description="Biblia Batch Runner")
-    parser.add_argument("batch_file", help="Path to batch JSON file")
-    
-    args = parser.parse_args()
-    
-    if not os.path.exists(args.batch_file):
-        print(f"Error: file {args.batch_file} not found.")
-        sys.exit(1)
-        
-    worker = BibliaWorker()
-    worker.process_batch(args.batch_file)
+from worker import BibliaWorker
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("batch_file", help="Path to batch JSON file")
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+    
+    worker = BibliaWorker(dry_run=args.dry_run)
+    worker.process_batch(args.batch_file)

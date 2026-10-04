@@ -28,3 +28,7 @@ python worker.py --batch batch.json
 ## Parametry CONFIG
 Są na sztywno zaszyte w `config.py` aby worker nie musiał szukać parametrów podczas startu.
 Zgodne ze stanem produkcyjnym na dzień 16.09.2026.
+
+
+## Update
+Dane z VSE/WP/YT zawsze weryfikuj po zapisie (200 OK bez treści). Dodano weryfikację i fail-fast.

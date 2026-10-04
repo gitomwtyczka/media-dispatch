@@ -564,7 +564,7 @@ async def get_p():
             p = resp.json()
             print(json.dumps({{'status': p.get('status'), 'date': p.get('date')}}))
         else:
-            print(json.dumps({{'status': f'err_{{resp.status_code}}'}}))
+            print(json.dumps({{'status': 'err_' + str(resp.status_code)}}))
 asyncio.run(get_p())
 """
             cmd = ["ssh", "-i", SSH_KEY, "-o", "StrictHostKeyChecking=no", VPS,

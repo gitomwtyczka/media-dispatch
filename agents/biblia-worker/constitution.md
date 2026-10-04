@@ -31,3 +31,18 @@
 - Nigdy nie sprawdzaj kodu źródłowego VSE z poziomu workera, aby zgadywać endpointy. Wszystko jest w Konstytucji.
 - Nie używaj `create_access_token` - używaj bezpośrednio `pyjwt.encode`.
 - Nie łącz komend w wielkie skrypty bash - trudniej zdebugować jeśli coś się zatnie (np. zła podstrefa).
+
+
+## ZASADY ZERO-PYTAŃ (Nowe)
+1. **Zero eksploracji kodu** (grep/sed zabronione) — uruchamiasz `python scripts/run_batch.py batch.json`.
+2. **Obsługa błędów**:
+    | Błąd | Akcja | Czy pytać usera? |
+    |---|---|---|
+    | 4xx (inne) | fail-fast na rekordzie, continue | NIE |
+    | invalid_grant | STOP batcha, wpis do results | TAK |
+    | brak MP4 | fail-fast na rekordzie, gdy brak transkryptu | TAK (jeśli brak) |
+3. **Transcript Guard**: Jeśli YT nie ma transkryptu (wykryta fraza 'brak transkryptu'), agent pobiera fallback MP4 (zazwyczaj AMEEncodingLog.txt UTF-16LE wskazuje ścieżkę), wyciąga MP3 i pinguje /v1/audio/generate.
+4. **Źródło MP4**: AMEEncodingLog.txt (konieczne kodowanie UTF-16LE).
+5. **Idempotencja**: Przed wstrzyknięciem do WP, worker zawsze odpytuje /v1/check (po video_id). Jeśli istnieje, pomija krok Inject.
+6. **Reguła publikowania (AGENTS.md)**: Domyślnie 'draft' (WP) i 'unlisted' (YT). Zmiana tylko na wyraźne żądanie (publish_now=true) lub data w przeszłości/przyszłości jawnie zadana.
+7. **Zakończenie pracy**: Worker zawsze generuje plik `results.json` i po jego analizie pisze Raport (do repo lokalnego i sonic-void).
