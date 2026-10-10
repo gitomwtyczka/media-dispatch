@@ -161,7 +161,7 @@ def test_step_verify_ok(mock_run):
     mock_run_res = MagicMock()
     mock_run_res.stdout = json.dumps({
         "status": "future", "date": "2026-10-10", "podcast_show": ["prawy-biblijny"],
-        "categories": ["biblia"], "meta": {"podcast_youtube_url": "https://www.youtube.com/watch?v=test_id"}
+        "categories": ["biblia"], "meta": {"podcast_youtube_url": "https://www.youtube.com/watch?v=test_id"}, "content": "To jest przykladowy wpis"
     }).encode()
     mock_run.return_value = mock_run_res
     
@@ -188,7 +188,7 @@ def test_step_verify_missing_playlist(mock_run):
     mock_run_res = MagicMock()
     mock_run_res.stdout = json.dumps({
         "status": "future", "date": "2026-10-10", "podcast_show": ["prawy-biblijny"],
-        "categories": ["biblia"], "meta": {"podcast_youtube_url": "https://www.youtube.com/watch?v=test_id"}
+        "categories": ["biblia"], "meta": {"podcast_youtube_url": "https://www.youtube.com/watch?v=test_id"}, "content": "To jest przykladowy wpis"
     }).encode()
     mock_run.return_value = mock_run_res
     
