@@ -38,9 +38,24 @@ class BibliaPipeline:
 
     def get_jwt_token(self):
         if self.dry_run:
-            print("[DRY RUN] Fetching JWT_SECRET and generating token...")
+            print("[DRY RUN] Generating token...")
             self.headers = {"Authorization": "Bearer mock", "Content-Type": "application/json"}
             return self.headers
+
+        print("[*] Generating JWT token via SSH inside vse-api...")
+        cmd = [
+            "ssh", "-i", config.SSH_KEY, "-o", "StrictHostKeyChecking=no", config.VPS,
+            "docker exec vse-api python3 -c \"import os,datetime; from jose import jwt; s=os.environ.get('JWT_SECRET_KEY',''); p={'sub':'" + config.USER_ID + "','exp':datetime.datetime.utcnow()+datetime.timedelta(hours=24)}; print(jwt.encode(p,s,algorithm='HS256'))\""
+        ]
+        import subprocess
+        r = subprocess.run(cmd, capture_output=True, timeout=30)
+        token = r.stdout.decode('utf-8', errors='replace').strip()
+        if not token:
+            err = r.stderr.decode('utf-8', errors='replace')[:200]
+            raise RuntimeError(f"JWT failed: {err}")
+        print(f"[0] JWT OK ({token[:30]}...)")
+        self.headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        return self.headers
 
         print("[*] Fetching JWT_SECRET via SSH...")
         output = self._run_ssh("grep JWT_SECRET /home/ubuntu/video-seo-engine/.env")
@@ -140,15 +155,16 @@ class BibliaPipeline:
         resp = requests.post(f"{config.VSE_BASE}/v1/generate", json=payload, headers=self.headers)
         self._fail_fast(resp, "Generate")
         data = resp.json()
+        schema = data.get("schema_data", {})
         
         # Transcript Guard
-        if "brak transkryptu" in data.get("transkrypcja", "").lower():
+        if "brak transkryptu" in str(schema).lower():
             print(f"[!] Brak transkryptu na YT. Uruchamiam fallback z mp4_path={mp4_path}...")
-            data = self.step1b_whisper_fallback(yt_id, mp4_path, title)
-            if not data:
+            schema = self.step1b_whisper_fallback(yt_id, mp4_path, title)
+            if not schema:
                 raise Exception(f"FAILED: Brak transkryptu i fallback Whisper nieudany dla {yt_id}")
             
-        return data
+        return schema
 
     def step1b_whisper_fallback(self, video_id: str, mp4_name: str, title: str):
         print(f"  [1b] FALLBACK Whisper dla: {mp4_name}")
@@ -235,8 +251,9 @@ class BibliaPipeline:
             resp = requests.post(f"{config.VSE_BASE}/v1/generate", json=payload, headers=self.headers)
             if resp.ok:
                 d = resp.json()
-                if "brak transkryptu" not in d.get("transkrypcja", "").lower():
-                    return d
+                s = d.get("schema_data", {})
+                if "brak transkryptu" not in str(s).lower():
+                    return s
 
         print("  [1b] Whisper fallback retry wyczerpane")
         return None
@@ -325,18 +342,32 @@ asyncio.run(check())
             return
             
         print(f"[*] Step 4: WP-CLI Post-processing for post {wp_post_id}...")
+        import tempfile
+        import subprocess
         
-        cmds = [
-            f"docker exec {config.WP_CONTAINER} wp post update {wp_post_id} --post_status={status} --post_date='{publish_date_local}' --post_date_gmt='{publish_date_gmt}' --edit_date=true --allow-root",
-            f"docker exec {config.WP_CONTAINER} wp post term add {wp_post_id} podcast_show prawy-biblijny --allow-root",
-            f"docker exec {config.WP_CONTAINER} wp term create category Biblia --slug=biblia --allow-root || true",
-            f"docker exec {config.WP_CONTAINER} wp post term add {wp_post_id} category biblia --allow-root",
-            f"docker exec {config.WP_CONTAINER} wp post meta update {wp_post_id} podcast_youtube_url 'https://www.youtube.com/watch?v={yt_id}' --allow-root",
-            f"docker exec {config.WP_CONTAINER} wp cache flush --allow-root"
-        ]
+        script_content = f"""#!/bin/bash
+docker exec {config.WP_CONTAINER} wp post update {wp_post_id} --post_status={status} --post_date="{publish_date_local}" --post_date_gmt="{publish_date_gmt}" --edit_date=true --allow-root
+docker exec {config.WP_CONTAINER} wp post term add {wp_post_id} podcast_show prawy-biblijny --allow-root
+docker exec {config.WP_CONTAINER} wp term create category Biblia --slug=biblia --allow-root || true
+docker exec {config.WP_CONTAINER} wp post term add {wp_post_id} category biblia --allow-root
+docker exec {config.WP_CONTAINER} wp post meta update {wp_post_id} podcast_youtube_url "https://www.youtube.com/watch?v={yt_id}" --allow-root
+docker exec {config.WP_CONTAINER} wp cache flush --allow-root
+"""
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.sh', newline='\n') as f:
+            f.write(script_content.replace('\r\n', '\n'))
+            temp_path = f.name
+            
+        # SCP
+        scp_cmd = ["scp", "-i", config.SSH_KEY, "-o", "StrictHostKeyChecking=no", temp_path, f"{config.VPS}:/tmp/wpcli_{wp_post_id}.sh"]
+        subprocess.run(scp_cmd, check=True)
         
-        for cmd in cmds:
-            self._run_ssh(cmd)
+        # SSH execute
+        ssh_cmd = ["ssh", "-i", config.SSH_KEY, "-o", "StrictHostKeyChecking=no", config.VPS, f"bash /tmp/wpcli_{wp_post_id}.sh"]
+        r = subprocess.run(ssh_cmd, capture_output=True, text=True)
+        if r.returncode != 0:
+            print(f"[-] WP-CLI script failed: {r.stderr}")
+        else:
+            print(f"[+] WP-CLI script OK")
 
     def step_youtube(self, yt_id, schema_data, publish_date_iso, status):
         if self.dry_run:

@@ -115,7 +115,7 @@ def test_timezone_parsing():
 def test_transcript_guard_real_fallback(mock_post, mock_run):
     mock_resp1 = MagicMock()
     mock_resp1.ok = True
-    mock_resp1.json.return_value = {"transkrypcja": "To wideo zawiera brak transkryptu."}
+    mock_resp1.json.return_value = {"schema_data": {"transkrypcja": "To wideo zawiera brak transkryptu."}}
     
     mock_resp2 = MagicMock()
     mock_resp2.status_code = 200
@@ -123,7 +123,7 @@ def test_transcript_guard_real_fallback(mock_post, mock_run):
     
     mock_resp3 = MagicMock()
     mock_resp3.ok = True
-    mock_resp3.json.return_value = {"transkrypcja": "Poprawny transkrypt po retry"}
+    mock_resp3.json.return_value = {"schema_data": {"transkrypcja": "Poprawny transkrypt po retry"}}
     
     mock_post.side_effect = [mock_resp1, mock_resp2, mock_resp3]
     
