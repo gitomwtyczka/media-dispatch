@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-biblia_schedule_pipeline.py — Pipeline dla 7 filmów biblijnych Oct 04 – Oct 10 2026
+biblia_schedule_pipeline.py — Pipeline dla 7 filmów biblijnych Oct 18 – Oct 24 2026
 
 Flow dla każdego video:
   0. Guard 3: sprawdź czy video istnieje na YT
@@ -9,13 +9,15 @@ Flow dla każdego video:
      - Guard 2: fail-fast na błędach 4xx (np. 422)
      - Guard 1: jeśli 'brak transkryptu' -> Whisper fallback z MP4 (max 2 retry)
   3. WP inject:
-     - dla 04.10: post_status=publish (publish now)
-     - dla pozostałych: post_status=future + data schedulowania
+     - dla 18.10 (publish_now=True): post_status=publish
+     - dla 19-24.10: post_status=future + data schedulowania
+     - kategoria 'Biblia': pobranie slug='biblia' z WP REST API, merge z istniejącymi kategoriami posta i cache ID
   4. YouTube status:
-     - dla 04.10: privacyStatus=public (bez publishAt)
-     - dla pozostałych: privacyStatus=private + publishAt (RFC3339)
+     - dla 18.10: privacyStatus=public (bez publishAt)
+     - dla 19-24.10: privacyStatus=private + publishAt (RFC3339)
+     - status.embeddable=True, snippet.defaultLanguage='pl', snippet.defaultAudioLanguage='pl'
   5. Playlista Prawy Biblijny (PLw7UeigJuyWkUzzvhS1vZX0H251raaYa7)
-  6. Weryfikacja końcowa i zapis do oct_pipeline_results.json
+  6. Weryfikacja końcowa parametrów YT/WP i zapis do oct18_pipeline_results.json
 
 Guard 4: capture_output=True, decode('utf-8', errors='replace'), invalid_grant -> STOP.
 """
@@ -29,28 +31,47 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from google.oauth2.credentials import Credentials
 
+class TeeLogger:
+    def __init__(self, filename):
+        self.terminal = sys.stdout
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
+        self.log = open(filename, 'w', encoding='utf-8', errors='replace')
+    def write(self, message):
+        self.terminal.write(message)
+        self.terminal.flush()
+        self.log.write(message)
+        self.log.flush()
+    def flush(self):
+        self.terminal.flush()
+        self.log.flush()
+
+sys.stdout = TeeLogger(r"tmp\biblia_pipeline.log")
+sys.stderr = sys.stdout
+
 # ===== CONFIG =====
 VSE_BASE      = "https://vse.impresjapr.pl"
 SSH_KEY       = r"C:\Users\tomas2\.ssh\oracle-crimson.key"
 VPS           = "ubuntu@147.224.162.100"
-MP4_DIR       = r"C:\Users\tomas2\Videos\Prawy\Biblia 04-10.10.2026"
+MP4_DIR       = r"C:\Users\tomas2\Videos\Prawy\Biblia 30.08-04.09.2026"
 PORTAL_ID     = "2b047d7d-15a1-4d2f-8463-f89c2275bb73"  # prawy.pl UUID
 PLAYLIST_ID   = "PLw7UeigJuyWkUzzvhS1vZX0H251raaYa7"   # Prawy Biblijny
-RESULTS_FILE  = r"C:\Users\tomas2\Videos\Prawy\oct_pipeline_results.json"
+RESULTS_FILE  = r"C:\Users\tomas2\Videos\Prawy\Biblia 30.08-04.09.2026\oct18_pipeline_results.json"
 
 # ===== VIDEOS LIST =====
 # (yt_id, mp4_filename, publish_date_iso, true_title_for_wp, publish_now)
 VIDEOS = [
-    ("h2ncQhExDw4", "2026-10-04_mt-21-33-43_kamien-wegielny_niedziela.mp4", "2026-10-04T00:00:00+02:00", "Mt 21,33-43 | Codzienne czytanie biblijne | 04.10.2026", True),
-    ("JTapGa_m6uc", "2026-10-05_lk-10-25-37_milosierny-samarytanin_poniedzialek.mp4", "2026-10-05T00:00:00+02:00", "Łk 10,25-37 | Codzienne czytanie biblijne | 05.10.2026", False),
-    ("UU3QEIA6CBU", "2026-10-06_lk-10-38-42_jednego-potrzeba_wtorek.mp4", "2026-10-06T00:00:00+02:00", "Łk 10,38-42 | Codzienne czytanie biblijne | 06.10.2026", False),
-    ("h97hhEe_Dcw", "2026-10-07_lk-11-1-4_naucz-nas-modlic-sie_sroda.mp4", "2026-10-07T00:00:00+02:00", "Łk 11,1-4 | Codzienne czytanie biblijne | 07.10.2026", False),
-    ("uirUFoX863w", "2026-10-08_lk-11-5-13_proscie-i-szukajcie_czwartek.mp4", "2026-10-08T00:00:00+02:00", "Łk 11,5-13 | Codzienne czytanie biblijne | 08.10.2026", False),
-    ("CQTjzmnFbHA", "2026-10-09_lk-11-15-26_krolestwo-podzielone_piatek.mp4", "2026-10-09T00:00:00+02:00", "Łk 11,15-26 | Codzienne czytanie biblijne | 09.10.2026", False),
-    ("ek0VxaoEIME", "2026-10-10_lk-11-27-28_prawdziwie-blogoslawieni_sobota.mp4", "2026-10-10T00:00:00+02:00", "Łk 11,27-28 | Codzienne czytanie biblijne | 10.10.2026", False),
+    ("tQUdCpUsCeY", "2026-10-18_mt-22-15-21_bogu-to-co-boskie_niedziela.mp4", "2026-10-18T00:00:00+02:00", "Mt 22,15-21 | Codzienne czytanie biblijne | 18.10.2026", True),
+    ("ocLzzn6ca9w", "2026-10-19_lk-12-13-21_glupi-bogacz_poniedzialek.mp4", "2026-10-19T00:00:00+02:00", "Lk 12,13-21 | Codzienne czytanie biblijne | 19.10.2026", False),
+    ("6BuHAty_Pa0", "2026-10-20_lk-12-35-38_czuwajcie_wtorek.mp4", "2026-10-20T00:00:00+02:00", "Lk 12,35-38 | Codzienne czytanie biblijne | 20.10.2026", False),
+    ("MEb-QEkNqr8", "2026-10-21_lk-12-39-48_wierny-i-roztropny_sroda.mp4", "2026-10-21T00:00:00+02:00", "Lk 12,39-48 | Codzienne czytanie biblijne | 21.10.2026", False),
+    ("HhWRQDbcrjI", "2026-10-22_lk-12-49-53_ogien-na-ziemi_czwartek.mp4", "2026-10-22T00:00:00+02:00", "Lk 12,49-53 | Codzienne czytanie biblijne | 22.10.2026", False),
+    ("BUlwq84Yd_E", "2026-10-23_lk-12-54-59_rozpoznac-czas_piatek.mp4", "2026-10-23T00:00:00+02:00", "Lk 12,54-59 | Codzienne czytanie biblijne | 23.10.2026", False),
+    ("wkbDeMMbl8E", "2026-10-24_lk-13-1-9_jeszcze-ten-rok_sobota.mp4", "2026-10-24T00:00:00+02:00", "Lk 13,1-9 | Codzienne czytanie biblijne | 24.10.2026", False),
 ]
 
 def vsh(t): return {"Authorization": f"Bearer {t}"}
+
+CACHED_BIBLIA_CAT_ID = None
 
 # ===== TOKENY =====
 
@@ -163,7 +184,7 @@ async def check():
                     print(json.dumps({{'found': True, 'id': p['id'], 'status': p['status'], 'date': p.get('date')}}))
                     return
         
-        # 2. Szukaj po tytule (np. 'Łk 10,25-37' lub 'Mt 21,33-43')
+        # 2. Szukaj po tytule (np. 'Lk 12,13-21' lub 'Mt 22,15-21')
         short_title = '{title}'.split('|')[0].strip()
         resp2 = requests.get(f"{{base_url}}/wp-json/wp/v2/posts?search={{short_title}}&status=publish,future,draft,pending,private", auth=auth, timeout=20)
         if resp2.status_code == 200:
@@ -190,6 +211,59 @@ asyncio.run(check())
             if data.get("found"):
                 return data["id"], data["status"]
     return None, None
+
+# ===== KATEGORIA BIBLIA WP =====
+
+def get_biblia_category_id() -> int:
+    """
+    Pobiera ID kategorii 'biblia' z WP REST API.
+    Slug dokładnie 'biblia'. Niejednoznaczne -> błąd. Cache'uje ID.
+    """
+    global CACHED_BIBLIA_CAT_ID
+    if CACHED_BIBLIA_CAT_ID is not None:
+        return CACHED_BIBLIA_CAT_ID
+
+    print("  [2a] Pobieram ID kategorii 'biblia' z WP...")
+    code = f"""
+import asyncio, requests, uuid, json
+from api.db import AsyncSessionLocal
+from api.models.portal import WpPortal
+from core.injector import _make_auth
+
+async def get_cat():
+    async with AsyncSessionLocal() as db:
+        portal = await db.get(WpPortal, uuid.UUID('{PORTAL_ID}'))
+        auth = _make_auth(portal.wp_username, portal.wp_app_password)
+        base = portal.url.rstrip('/ ')
+        r = requests.get(f"{{base}}/wp-json/wp/v2/categories?search=biblia", auth=auth, timeout=15)
+        if r.status_code != 200:
+            print(json.dumps({{'error': f'HTTP {{r.status_code}}: {{r.text[:100]}}'}}))
+            return
+        cats = [c for c in r.json() if c.get('slug') == 'biblia']
+        if len(cats) != 1:
+            print(json.dumps({{'error': f'Niejednoznaczny wynik dla slug=biblia (znaleziono {{len(cats)}})'}}))
+            return
+        print(json.dumps({{'id': cats[0]['id'], 'name': cats[0]['name'], 'slug': cats[0]['slug']}}))
+
+asyncio.run(get_cat())
+"""
+    cmd = [
+        "ssh", "-i", SSH_KEY, "-o", "StrictHostKeyChecking=no", VPS,
+        f"docker exec -w /app vse-api python3 -c {subprocess.list2cmdline([code])}"
+    ]
+    r = subprocess.run(cmd, capture_output=True, timeout=30)
+    out = r.stdout.decode('utf-8', errors='replace').strip()
+    for line in out.splitlines():
+        if '{"id"' in line:
+            data = json.loads(line)
+            CACHED_BIBLIA_CAT_ID = data["id"]
+            print(f"  [2a] Znaleziono kategorię '{data['name']}' (ID: {CACHED_BIBLIA_CAT_ID})")
+            return CACHED_BIBLIA_CAT_ID
+        if '{"error"' in line:
+            err = json.loads(line).get("error")
+            raise RuntimeError(f"Błąd wyszukiwania kategorii Biblia: {err}")
+    
+    raise RuntimeError(f"Nie udało się pobrać kategorii biblia z WP! Output: {out}")
 
 # ===== KROKI PIPELINE =====
 
@@ -338,6 +412,7 @@ def step2_inject_wp(schema: dict, pub_at: str, vse_token: str, video_id: str, pu
     Inject do WP:
     - publish_now=True: post_status='publish'
     - publish_now=False: post_status='future' + data schedulowania
+    - kategoria 'Biblia': dopisanie ID kategorii do posta (merge)
     """
     target_status = "publish" if publish_now else "future"
     print(f"  [2] WP inject ({target_status}): {video_id} → {pub_at if not publish_now else 'TERAZ'}")
@@ -353,26 +428,41 @@ def step2_inject_wp(schema: dict, pub_at: str, vse_token: str, video_id: str, pu
     pid = resp.get("wp_post_id") or resp.get("post_id")
     print(f"  [2] WP post_id: {pid}")
 
-    # Aktualizacja daty i statusu na WP
+    # Aktualizacja daty, statusu i kategorii 'Biblia' na WP
     if pid:
-        date_param = f", 'date': '{pub_at}'" if (pub_at and not publish_now) else ""
-        print(f"  [2b] Ustawiam WP #{pid} status={target_status}{date_param}")
-        code = (
-            "import asyncio, requests\n"
-            "from api.db import AsyncSessionLocal\n"
-            "from api.models.portal import WpPortal\n"
-            "from core.injector import _make_auth\n"
-            "import uuid\n"
-            "async def update_date():\n"
-            "    async with AsyncSessionLocal() as db:\n"
-            f"        portal = await db.get(WpPortal, uuid.UUID('{PORTAL_ID}'))\n"
-            "        auth = _make_auth(portal.wp_username, portal.wp_app_password)\n"
-            f"        payload = {{'status': '{target_status}'{date_param}}}\n"
-            f"        resp = requests.post(f'{{portal.url.rstrip(\"/ \")}}/wp-json/wp/v2/posts/{pid}',\n"
-            "            json=payload, auth=auth, timeout=20)\n"
-            "        print(f'WP date/status: {resp.status_code} {resp.text[:100]}')\n"
-            "asyncio.run(update_date())\n"
-        )
+        biblia_cat_id = get_biblia_category_id()
+        print(f"  [2b] Ustawiam WP #{pid} status={target_status}, date={pub_at if not publish_now else 'now'}, kategoria Biblia (ID: {biblia_cat_id})")
+        code = f"""
+import asyncio, requests, json, uuid
+from api.db import AsyncSessionLocal
+from api.models.portal import WpPortal
+from core.injector import _make_auth
+
+async def update_post():
+    async with AsyncSessionLocal() as db:
+        portal = await db.get(WpPortal, uuid.UUID('{PORTAL_ID}'))
+        auth = _make_auth(portal.wp_username, portal.wp_app_password)
+        base = portal.url.rstrip('/ ')
+        
+        # 1. Pobierz bieżące kategorie posta
+        r_get = requests.get(f"{{base}}/wp-json/wp/v2/posts/{pid}", auth=auth, timeout=20)
+        curr_cats = []
+        if r_get.status_code == 200:
+            curr_cats = r_get.json().get('categories', [])
+        
+        # 2. Zmerguj kategorię Biblia
+        merged_cats = list(dict.fromkeys(curr_cats + [{biblia_cat_id}]))
+        
+        # 3. Payload
+        payload = {{'status': '{target_status}', 'categories': merged_cats}}
+        if '{pub_at}' and not {publish_now}:
+            payload['date'] = '{pub_at}'
+            
+        r_post = requests.post(f"{{base}}/wp-json/wp/v2/posts/{pid}", json=payload, auth=auth, timeout=20)
+        print(f"WP update: {{r_post.status_code}} cats={{merged_cats}} text={{r_post.text[:100]}}")
+
+asyncio.run(update_post())
+"""
         cmd = ["ssh", "-i", SSH_KEY, "-o", "StrictHostKeyChecking=no", VPS,
                f"docker exec -w /app vse-api python3 -c {subprocess.list2cmdline([code])}"]
         r_date = subprocess.run(cmd, capture_output=True, timeout=30)
@@ -385,6 +475,8 @@ def step3_yt_schedule(video_id: str, pub_at: str, yt_title: str, yt_desc: str, y
     YouTube status:
     - publish_now=True: privacyStatus='public' (bez publishAt)
     - publish_now=False: privacyStatus='private' + publishAt
+    - embeddable=True, defaultLanguage='pl', defaultAudioLanguage='pl'
+    - zachowaj title/description/categoryId/tags oraz selfDeclaredMadeForKids
     """
     action_name = "PUBLIC" if publish_now else f"SCHEDULE {pub_at}"
     print(f"  [3] YT {action_name}: {video_id}")
@@ -395,16 +487,28 @@ def step3_yt_schedule(video_id: str, pub_at: str, yt_title: str, yt_desc: str, y
             v_resp = youtube.videos().list(part="snippet,status", id=video_id).execute()
             if not v_resp.get("items"):
                 continue
-            snippet = v_resp["items"][0]["snippet"]
+            item = v_resp["items"][0]
+            snippet = item["snippet"]
+            existing_status = item["status"]
+
             if yt_title:
-                snippet["title"] = yt_title
+                snippet["title"] = yt_title[:100]
             if yt_desc:
                 snippet["description"] = yt_desc
+            snippet["defaultLanguage"] = "pl"
+            snippet["defaultAudioLanguage"] = "pl"
             
+            status_dict = {
+                "embeddable": True,
+            }
+            if "selfDeclaredMadeForKids" in existing_status:
+                status_dict["selfDeclaredMadeForKids"] = existing_status["selfDeclaredMadeForKids"]
+
             if publish_now:
-                status_dict = {"privacyStatus": "public"}
+                status_dict["privacyStatus"] = "public"
             else:
-                status_dict = {"privacyStatus": "private", "publishAt": pub_at}
+                status_dict["privacyStatus"] = "private"
+                status_dict["publishAt"] = pub_at
 
             youtube.videos().update(
                 part="snippet,status",
@@ -414,7 +518,7 @@ def step3_yt_schedule(video_id: str, pub_at: str, yt_title: str, yt_desc: str, y
                     "status": status_dict
                 }
             ).execute()
-            print(f"  [3] YT update OK ({t_info['title']}) → {action_name}")
+            print(f"  [3] YT update OK ({t_info['title']}) → {action_name} | embeddable=True | lang=pl")
             return True
         except Exception as e:
             if "invalid_grant" in str(e).lower():
@@ -466,7 +570,8 @@ if __name__ == "__main__":
             results.append({
                 "date": date_str, "reading": reading_str, "yt_id": yt_id,
                 "wp_post_id": None, "yt_status": "videoNotFound",
-                "wp_status": "none", "ok": False, "error": "videoNotFound on all YT tokens"
+                "wp_status": "none", "ok": False, "publish_now": publish_now,
+                "error": "videoNotFound on all YT tokens"
             })
             continue
 
@@ -483,7 +588,8 @@ if __name__ == "__main__":
             results.append({
                 "date": date_str, "reading": reading_str, "yt_id": yt_id,
                 "wp_post_id": existing_wp_id, "yt_status": "fail",
-                "wp_status": existing_wp_status or "fail", "ok": False, "error": err
+                "wp_status": existing_wp_status or "fail", "ok": False, "publish_now": publish_now,
+                "error": err
             })
             continue
 
@@ -497,7 +603,8 @@ if __name__ == "__main__":
             results.append({
                 "date": date_str, "reading": reading_str, "yt_id": yt_id,
                 "wp_post_id": existing_wp_id, "yt_status": "fail",
-                "wp_status": existing_wp_status or "fail", "ok": False, "error": "no_schema"
+                "wp_status": existing_wp_status or "fail", "ok": False, "publish_now": publish_now,
+                "error": "no_schema"
             })
             continue
 
@@ -521,6 +628,7 @@ if __name__ == "__main__":
             "wp_post_id": wp_post_id,
             "yt_status": "public" if publish_now else f"private+{pub_at}",
             "wp_status": "publish" if publish_now else "future",
+            "publish_now": publish_now,
             "ok": bool(wp_post_id and yt_ok and pl_ok),
             "error": None if (wp_post_id and yt_ok and pl_ok) else "partial_failure"
         })
@@ -530,26 +638,37 @@ if __name__ == "__main__":
     verified_results = []
     for res in results:
         v_id = res["yt_id"]
+        is_pub_now = res.get("publish_now", False)
         # Weryfikacja YT
         yt_stat_str = "unknown"
+        yt_details = {}
         for t_info in yt_tokens:
             try:
                 creds = Credentials(t_info["token"])
                 youtube = build("youtube", "v3", credentials=creds)
-                r_v = youtube.videos().list(part="status", id=v_id).execute()
+                r_v = youtube.videos().list(part="snippet,status", id=v_id).execute()
                 if r_v.get("items"):
                     st = r_v["items"][0]["status"]
+                    sn = r_v["items"][0]["snippet"]
                     yt_stat_str = f"{st.get('privacyStatus')}"
                     if st.get('publishAt'):
                         yt_stat_str += f"+{st.get('publishAt')}"
+                    yt_details = {
+                        "privacyStatus": st.get("privacyStatus"),
+                        "publishAt": st.get("publishAt"),
+                        "embeddable": st.get("embeddable"),
+                        "defaultLanguage": sn.get("defaultLanguage"),
+                        "defaultAudioLanguage": sn.get("defaultAudioLanguage")
+                    }
                     break
             except Exception:
                 pass
 
         # Weryfikacja WP
         wp_stat_str = res["wp_status"]
+        wp_details = {}
         if res.get("wp_post_id"):
-            code = f"""
+            wp_code = f"""
 import asyncio, requests, json, uuid
 from api.db import AsyncSessionLocal
 from api.models.portal import WpPortal
@@ -562,22 +681,55 @@ async def get_p():
         resp = requests.get(f"{{portal.url.rstrip('/')}}/wp-json/wp/v2/posts/{res['wp_post_id']}", auth=auth, timeout=15)
         if resp.status_code == 200:
             p = resp.json()
-            print(json.dumps({{'status': p.get('status'), 'date': p.get('date')}}))
+            print(json.dumps({{
+                'status': p.get('status'),
+                'date': p.get('date'),
+                'categories': p.get('categories', [])
+            }}))
         else:
             print(json.dumps({{'status': 'err_' + str(resp.status_code)}}))
 asyncio.run(get_p())
 """
             cmd = ["ssh", "-i", SSH_KEY, "-o", "StrictHostKeyChecking=no", VPS,
-                   f"docker exec -w /app vse-api python3 -c {subprocess.list2cmdline([code])}"]
+                   f"docker exec -w /app vse-api python3 -c {subprocess.list2cmdline([wp_code])}"]
             r_w = subprocess.run(cmd, capture_output=True, timeout=25)
             s_out = r_w.stdout.decode('utf-8', errors='replace').strip()
             for l in s_out.splitlines():
                 if '{"status"' in l:
-                    d = json.loads(l)
-                    wp_stat_str = f"{d.get('status')}"
-                    if d.get('date'):
-                        wp_stat_str += f" ({d.get('date')})"
+                    try:
+                        d = json.loads(l)
+                        wp_stat_str = f"{d.get('status')}"
+                        if d.get('date'):
+                            wp_stat_str += f" ({d.get('date')})"
+                        wp_details = d
+                    except Exception:
+                        pass
                     break
+
+        has_biblia_cat = (CACHED_BIBLIA_CAT_ID in wp_details.get("categories", [])) if CACHED_BIBLIA_CAT_ID else False
+        if is_pub_now:
+            yt_check_ok = (
+                yt_details.get("privacyStatus") == "public" and
+                yt_details.get("embeddable") is True and
+                yt_details.get("defaultLanguage") == "pl"
+            )
+            wp_check_ok = (
+                wp_details.get("status") == "publish" and
+                has_biblia_cat is True
+            )
+        else:
+            yt_check_ok = (
+                yt_details.get("privacyStatus") == "private" and
+                yt_details.get("publishAt") is not None and
+                yt_details.get("embeddable") is True and
+                yt_details.get("defaultLanguage") == "pl"
+            )
+            wp_check_ok = (
+                wp_details.get("status") == "future" and
+                has_biblia_cat is True
+            )
+
+        overall_ok = bool(res["ok"] and yt_check_ok and wp_check_ok)
 
         v_entry = {
             "date": res["date"],
@@ -585,11 +737,13 @@ asyncio.run(get_p())
             "yt_id": res["yt_id"],
             "wp_post_id": res["wp_post_id"],
             "yt_verified": yt_stat_str,
+            "yt_details": yt_details,
             "wp_verified": wp_stat_str,
-            "ok": res["ok"]
+            "wp_details": wp_details,
+            "ok": overall_ok
         }
         verified_results.append(v_entry)
-        print(f"  {'✅' if res['ok'] else '❌'} {res['date']} | {res['reading']} | YT: {yt_stat_str} | WP: #{res['wp_post_id']} ({wp_stat_str})")
+        print(f"  {'✅' if overall_ok else '❌'} {res['date']} | {res['reading']} | YT: {yt_stat_str} (embed={yt_details.get('embeddable')}, lang={yt_details.get('defaultLanguage')}) | WP: #{res['wp_post_id']} ({wp_stat_str}, cats={wp_details.get('categories')})")
 
     # Zapis do JSON
     Path(RESULTS_FILE).parent.mkdir(parents=True, exist_ok=True)
