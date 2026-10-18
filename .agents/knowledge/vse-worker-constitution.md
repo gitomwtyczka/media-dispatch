@@ -755,6 +755,60 @@ for ch in channels:
     # ... obsluga kanalu
 ```
 
+
+---
+
+## 18. Kroki obowiązkowe pipeline biblijnego
+
+> Dodane: 18.10.2026 | media-dev-biblia — sformalizowany standard publikacji czytań biblijnych na WP i YT
+
+Każde uruchomienie pipeline dla materiałów biblijnych (Biblia codzienna / Prawy Biblijny) MUSI realizować poniższe kroki w podanej kolejności:
+
+1. **AME Log jako źródło prawdy:**
+   - Ścieżka: `C:\Users\tomas2\Documents\Adobe\Adobe Media Encoder\26.0\AMEEncodingLog.txt` (UTF-16LE).
+   - Dopasowanie wpisów `YouTube - https://www.youtube.com/watch?v=ID` i plików MP4.
+   - Weryfikacja tytułów przez YouTube API `videos.list`.
+   - **Zakaz duplikatów:** jeśli tytuł/odcinek występuje podwójnie — NIE wybieraj i NIE usuwaj; zgłoś obie pary ID do Supervisora.
+
+2. **Pobranie tokenów przez SSH (`vse-api`):**
+   - JWT dla VSE (`jose.jwt.encode` z `JWT_SECRET_KEY`).
+   - Tokeny YouTube OAuth dla konta `tobroz@gmail.com` przez `_build_credentials(ch).refresh()`.
+   - Ignorowanie kont `invalid_grant` (np. VeriNarrMundo) bez prób debugowania.
+
+3. **Guards idempotencji i bezpieczeństwa:**
+   - **Guard 3:** sprawdzenie `videos.list(id)` przed przetwarzaniem (czy film istnieje na YT).
+   - **Guard 5:** sprawdzenie idempotencji WP (czy post o danym ID YT lub tytule już istnieje).
+   - **Guard 2:** fail-fast na błędach HTTP 4xx z VSE.
+   - **Guard 1:** jeśli w tytule/opisie/leadzie pojawi się fraza 'brak transkryptu' / 'brak transkrypcji' pomimo HTTP 200 — wymuszenie Whisper fallback z pliku MP4 (MP4 → MP3 → `/v1/audio/generate` → VTT → YT `captions.insert` → ponów `/v1/generate`).
+
+4. **Wstrzyknięcie do WordPress (`POST /v1/inject`):**
+   - Parametry: `portal_id="2b047d7d-15a1-4d2f-8463-f89c2275bb73"`, `publication_type="full_analysis"`, `llm_provider="claude"`.
+   - Status: `post_status="future"` z datą schedulowania `00:00:00+02:00` (lub `publish` przy wyraźnym poleceniu publikacji natychmiastowej).
+
+5. **Kategoria WordPress 'Biblia' (Obowiązkowy merge):**
+   - Wyszukanie w WP REST API: `GET /wp-json/wp/v2/categories?search=biblia`, weryfikacja dokładnego sluga `slug == 'biblia'` (ID: `3289`).
+   - Niejednoznaczność lub brak → zgłoś błąd, nie zgaduj.
+   - Pobranie aktualnych kategorii posta: `GET /wp-json/wp/v2/posts/{id}`.
+   - Scalenie (merge) bez nadpisywania: `merged_cats = list(dict.fromkeys(curr_cats + [biblia_cat_id]))`.
+   - Aktualizacja: `POST /wp-json/wp/v2/posts/{id}` z `categories: merged_cats` (oraz `status` i ewentualnie `date`).
+   - Cache ID kategorii w procesie workera.
+
+6. **Aktualizacja YouTube API (`videos().update(part="snippet,status")`):**
+   - `status.embeddable = True`
+   - `snippet.defaultLanguage = "pl"`
+   - `snippet.defaultAudioLanguage = "pl"`
+   - Zachowanie istniejących: `title`, `description`, `categoryId`, `tags`, `selfDeclaredMadeForKids`.
+   - Status: `privacyStatus="private"` + `publishAt` (lub `privacyStatus="public"` bez `publishAt` dla natychmiastowej publikacji).
+
+7. **Dodanie do playlisty Prawy Biblijny:**
+   - Playlista: `PLw7UeigJuyWkUzzvhS1vZX0H251raaYa7`.
+   - Sprawdzenie czy wideo już jest w playliście przed wykonaniem `playlistItems().insert`.
+
+8. **Weryfikacja końcowa parametrów i raport wyników:**
+   - Odpytanie `videos.list` (sprawdzenie `privacyStatus`, `publishAt`, `embeddable`, `defaultLanguage`).
+   - Odpytanie WP REST API `GET /wp-json/wp/v2/posts/{id}` (sprawdzenie `status`, `date`, obecności kategorii Biblia w `categories`).
+   - Zapis wyników do pliku `oct18_pipeline_results.json` w katalogu partii AME.
+
 ---
 
 *[media-strateg-01 | media-dispatch 29.08.2026 — init]*  
@@ -763,4 +817,5 @@ for ch in channels:
 *[media-strateg | media-dispatch 30.08.2026 — pułapki 11-14: llm_provider=claude, publication_type=full_analysis, portal_id UUID, YT token przez SSH _build_credentials]*  
 *[media-dev-12 | media-dispatch 31.08.2026 — sekcja Short Machine API (/v1/shorts/describe) na produkcji, pułapki 15-18]*  
 *[media-dev-39 | media-dispatch 22.09.2026 — aktualizacja sekcji 3 (publish-description broken), sekcji 11 (flow candidates→render), sekcji 14 (live response biblia pattern, videos.list przed update), pułapki 19-21, sekcja 17 kanały aktywne]*  
-*[media-dev-38 | media-dispatch 22.09.2026 — sekcja 16 AME log (resolve_ame_local_paths, update_local_overrides_safe), sekcja 11 rozbudowana (4 kroki: generate-srt→candidates→render→describe), pułapki 22-26, poprawka video_url w sek. 3/9/14, kanały YT sek. 6 uzupełnione o out-of-scope]*
+*[media-dev-38 | media-dispatch 22.09.2026 — sekcja 16 AME log (resolve_ame_local_paths, update_local_overrides_safe), sekcja 11 rozbudowana (4 kroki: generate-srt→candidates→render→describe), pułapki 22-26, poprawka video_url w sek. 3/9/14, kanały YT sek. 6 uzupełnione o out-of-scope]*  
+*[media-dev-biblia | media-dispatch 18.10.2026 — sekcja 18 (Kroki obowiązkowe pipeline biblijnego per dispatch 18.10), WP kategoria Biblia merge, YT embeddable+pl]*
